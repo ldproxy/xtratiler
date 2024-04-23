@@ -1,0 +1,22 @@
+{
+  "name": "maptiler",
+  "version": "0.9.0",
+  "description": "",
+  "author": "interactive instruments GmbH",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "rimraf ./dist && tsc",
+    "start": "npm run build && node ./dist/index.js",
+    "dev": "tsx ./src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@tsconfig/node20": "^20.1.4",
+    "@types/node": "^20.12.7",
+    "rimraf": "^5.0.5",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  }
+}
