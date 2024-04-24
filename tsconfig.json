@@ -1,9 +1,9 @@
 {
   "extends": "@tsconfig/node20/tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src",                                  /* Specify the root folder within your source files. */
-    "outDir": "./dist",                                   /* Specify an output folder for all emitted files. */
-    "allowJs": false,                                  /* Allow JavaScript files to be a part of your program. Use the 'checkJS' option to get errors from these files. */
-    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
+    "rootDir": "./src" /* Specify the root folder within your source files. */,
+    "outDir": "./dist" /* Specify an output folder for all emitted files. */,
+    "allowJs": false /* Allow JavaScript files to be a part of your program. Use the 'checkJS' option to get errors from these files. */,
+    "forceConsistentCasingInFileNames": true /* Ensure that casing is correct in imports. */
   }
 }
