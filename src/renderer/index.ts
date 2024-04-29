@@ -1,104 +1,103 @@
 import fs from "fs/promises";
-import mbgl, {
-  Map,
-  RenderOptions,
-  MapOptions,
-} from "@maplibre/maplibre-gl-native";
-import { createRequestHandler } from "./assets.js";
-import { ResourceType, createStoreFs } from "../store/index.js";
+import type { IntRange } from "type-fest";
+
 import { logger } from "../util/index.js";
+import { ResourceType, Store, createStoreFs } from "../store/index.js";
 import readStyle, { cleanupStyle } from "../style/index.js";
-import { toPNG } from "./png.js";
+import { renderImage } from "./image.js";
+import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
+import { getTileCenter, isEdgeTile } from "../util/coordinates.js";
 
-export const render = async (stylePath: string, storePath: string) => {
+export type JobParameters = {
+  stylePath: string;
+  storePath: string;
+  z: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  size: 256 | 512;
+  ratio: IntRange<0, 8>;
+};
+
+type TileParameters = {
+  style: StyleSpecification;
+  store: Store;
+  z: number;
+  x: number;
+  y: number;
+  size: 256 | 512;
+  ratio: IntRange<0, 8>;
+};
+
+export const render = async ({
+  stylePath,
+  storePath,
+  z,
+  minX,
+  maxX,
+  minY,
+  maxY,
+  size,
+  ratio,
+}: JobParameters) => {
   try {
-    let height = 512;
-    let width = 512;
-    let bufferHeight = 512;
-    let bufferWidth = 512;
-
-    height = height + bufferHeight * 2;
-    width = width + bufferWidth * 2;
-
-    const img = await renderImage(stylePath, storePath, width, height);
-
-    const png = await toPNG(
-      img,
-      width,
-      height,
-      1,
-      bufferWidth,
-      bufferHeight,
-      1
+    const store = createStoreFs(
+      storePath,
+      stylePath.substring(0, stylePath.indexOf("/"))
     );
 
-    await fs.writeFile("output.png", png);
+    const styleRaw = await store.read(ResourceType.Style, stylePath);
+
+    logger.debug(
+      "Render map with style: " + store.path(ResourceType.Style, stylePath)
+    );
+
+    const style = cleanupStyle(readStyle(styleRaw));
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        //TODO: parallelize
+        await renderTile({ style, store, z, x, y, size, ratio });
+      }
+    }
   } catch (e) {
     logger.error(e);
     process.exit(1);
   }
 };
 
-const renderImage = async (
-  stylePath: string,
-  storePath: string,
-  width: number,
-  height: number
-): Promise<Uint8Array> => {
-  const store = createStoreFs(storePath);
-  const requestHandler = createRequestHandler(store, "vineyards");
+export const renderTile = async ({
+  style,
+  store,
+  z,
+  x,
+  y,
+  size,
+  ratio,
+}: TileParameters) => {
+  logger.info(`Rendering tile ${z}/${x}/${y} with size ${size}`);
+  try {
+    const resultEdgeTile = isEdgeTile(z, x, y);
+    const bufferX = z === 0 ? 0 : size;
+    const bufferY = resultEdgeTile.y ? 0 : size;
 
-  const map = new mbgl.Map({
-    request: requestHandler,
-    ratio: 1.0,
-  });
-
-  const style = await store.read("", ResourceType.Style, stylePath);
-
-  logger.debug(
-    "Render map with style: " + store.path(ResourceType.Style, stylePath)
-  );
-
-  const styleJson = cleanupStyle(readStyle(style));
-
-  logger.debug(
-    "Render map with style: \n" + JSON.stringify(styleJson, null, 2)
-  );
-
-  map.load(styleJson);
-
-  const zoom = 8;
-  const center: [number, number] = [7.35, 49.8];
-
-  const imgBuffer = await renderMap(map, {
-    zoom,
-    center,
-    height,
-    width,
-    bearing: 0,
-    pitch: 0,
-  });
-
-  return imgBuffer;
-};
-
-const renderMap = async (
-  map: Map,
-  options: RenderOptions
-): Promise<Uint8Array> => {
-  return new Promise((resolve, reject) => {
-    map.render(options, (error, buffer) => {
-      try {
-        map.release();
-      } catch (e) {
-        // ignore
-      }
-
-      if (error) {
-        return reject(error);
-      }
-
-      return resolve(buffer);
+    const png = await renderImage({
+      style,
+      store,
+      zoom: z,
+      center: getTileCenter(z, y, x, size),
+      width: size + bufferX * 2,
+      height: size + bufferY * 2,
+      bufferX,
+      bufferY,
+      ratio: ratio,
     });
-  });
+
+    await fs.writeFile(`output_${z}_${x}_${y}.png`, png);
+  } catch (e) {
+    //TODO
+    logger.error(e);
+    process.exit(1);
+  }
 };
