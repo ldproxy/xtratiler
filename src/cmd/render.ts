@@ -99,18 +99,18 @@ export const builder = (yargs: Argv<{}>) => {
 
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<RenderArgs>;
+
+  const eight = { z: 8, minX: 153, maxX: 154, minY: 102, maxY: 103 };
+  const nine = { z: 9, minX: 306, maxX: 308, minY: 205, maxY: 207 };
+
   //TODO: validate input, parse other
   const job: JobParameters = {
     stylePath: argv2.style,
     storePath: argv2.store,
-    z: 8,
-    minX: 102, //86,
-    maxX: 103, //87,
-    minY: 153, //132,
-    maxY: 154, //133,
-    //TODO: is this defined in the tms?
+    ...eight,
+    //TODO: is this defined in the tms? yes
     size: 256,
-    ratio: 2,
+    ratio: 1,
   };
 
   const proceed = argv.yes || (await confirmRender(job));

@@ -61,6 +61,9 @@ const renderMapLibrePromise = async (
   map: Map,
   options: RenderOptions
 ): Promise<Uint8Array> => {
+  logger.debug(
+    "Render map with options: \n" + JSON.stringify(options, null, 2)
+  );
   return new Promise((resolve, reject) => {
     map.render(options, (error, buffer) => {
       try {

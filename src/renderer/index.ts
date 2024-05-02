@@ -81,12 +81,13 @@ export const renderTile = async ({
     const resultEdgeTile = isEdgeTile(z, x, y);
     const bufferX = z === 0 ? 0 : size;
     const bufferY = resultEdgeTile.y ? 0 : size;
+    logger.debug(`Buffer: ${bufferX}, ${bufferY}`);
 
     const png = await renderImage({
       style,
       store,
-      zoom: z,
-      center: getTileCenter(z, y, x, size),
+      zoom: Math.max(z - 1, 0),
+      center: getTileCenter(z, x, y, size),
       width: size + bufferX * 2,
       height: size + bufferY * 2,
       bufferX,
@@ -94,7 +95,7 @@ export const renderTile = async ({
       ratio: ratio,
     });
 
-    await fs.writeFile(`output_${z}_${x}_${y}.png`, png);
+    await fs.writeFile(`out/output_${z}_${x}_${y}.png`, png);
   } catch (e) {
     //TODO
     logger.error(e);

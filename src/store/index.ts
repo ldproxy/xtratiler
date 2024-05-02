@@ -30,7 +30,7 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
 
     if (type === ResourceType.TileJson) {
       storePath = storePath
-        .replace("{serviceUrl}/tiles", api + "_")
+        .replace("{serviceUrl}/tiles/", api + "_")
         .replace("?f=tile", ".");
     } else if (type === ResourceType.Tile) {
       storePath = storePath
