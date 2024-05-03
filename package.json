@@ -1,7 +1,7 @@
 {
   "name": "xtratiler",
   "version": "0.9.0",
-  "description": "",
+  "description": "raster tile renderer for ldproxy",
   "author": "interactive instruments GmbH",
   "license": "MIT",
   "type": "module",
@@ -11,19 +11,25 @@
     "start": "npm run build && node ./build/index.cjs",
     "dev": "tsx ./src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepkg": "npm run build && rimraf ./dist && mkdir dist && cp -r build/lib dist/ && node --experimental-sea-config sea-config.json && cp $(command -v node) ./dist/xtratiler && chmod 0755 ./dist/xtratiler",
-    "prepkgmac": "npm run prepkg && codesign --remove-signature ./dist/xtratiler",
-    "pkg": "npm run prepkg && postject ./dist/xtratiler NODE_SEA_BLOB ./build/sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
-    "pkgmac": "npm run prepkgmac && postject ./dist/xtratiler NODE_SEA_BLOB ./build/sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA && codesign --sign - ./dist/xtratiler"
+    "clean": "rimraf build && rimraf dist",
+    "presea": "npm run build && node dist.js --pre && node --experimental-sea-config $(node dist.js --sea-path)",
+    "preseamac": "npm run presea && codesign --remove-signature $(node dist.js --bin-path)",
+    "sea": "node dist.js",
+    "seamac": "node dist.js --mac && codesign --sign - $(node dist.js --bin-path)",
+    "deb": "npm run sea && node deb.js",
+    "deblin": "docker run -it --rm -v ./:/src --platform=linux/amd64 node:20 /bin/bash -c \"cd /src && rm -rf node_modules && npm install && npm run deb\""
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
     "@types/node": "^20.12.7",
     "@types/yargs": "^17.0.32",
+    "debian-packaging": "^0.1.5",
+    "download": "^8.0.0",
     "esbuild": "^0.20.2",
     "esbuild-plugin-clean": "^1.0.1",
     "esbuild-plugin-copy": "^2.1.1",
     "esbuild-plugin-replace": "^1.4.0",
+    "fs-extra": "^11.2.0",
     "postject": "^1.0.0-alpha.6",
     "rimraf": "^5.0.5",
     "tsx": "^4.7.2",
@@ -37,6 +43,7 @@
     "@maplibre/maplibre-gl-style-spec": "^20.1.1",
     "pino": "^8.20.0",
     "pino-pretty": "^11.0.0",
+    "promisify-child-process": "^4.1.2",
     "sharp": "^0.33.3",
     "yargs": "^17.7.2"
   }

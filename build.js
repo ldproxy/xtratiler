@@ -42,18 +42,26 @@ await build({
       delimiters: ["", ""],
       values: {
         "require('../../lib/node-v'":
-          "require2('./lib/@maplibre/maplibre-gl-native/lib/node-v'",
+          "require2('../lib/@maplibre/maplibre-gl-native/lib/node-v'",
         "process.versions.modules": `"${process.versions.modules}"`,
         "${runtimePlatform}": platform,
         "/mbgl": "/mbgl.node",
-        "if (sharp) {": `sharp = require2('./lib/@img/sharp-${platform}/lib/sharp-${platform}.node'); if (sharp) {`,
+        "if (sharp) {": `sharp = require2('../lib/@img/sharp-${platform}/lib/sharp-${platform}.node'); if (sharp) {`,
       },
     }),
     copy({
       assets: [
         {
-          from: ["./node_modules/**/*.node", "./node_modules/**/*.dylib"],
-          to: ["./lib"],
+          from: ["./node_modules/@maplibre/**/*.node"],
+          to: ["./lib/@maplibre"],
+        },
+        {
+          from: [
+            "./node_modules/@img/**/*.node",
+            "./node_modules/@img/**/*.dylib",
+            "./node_modules/@img/**/*.so.42",
+          ],
+          to: ["./lib/@img"],
         },
       ],
     }),
