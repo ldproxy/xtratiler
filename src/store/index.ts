@@ -1,21 +1,29 @@
 import fs from "fs/promises";
 import { join } from "path";
-
 import { RequestResponse, ResourceKind } from "@maplibre/maplibre-gl-native";
-import { logger } from "../util/index.js";
+import { Logger } from "../util/index.js";
+import { ResourceType, getResourceType, resourceTypeToDir } from "./common.js";
+import { getCaches, getProvider } from "./provider.js";
+
+export const enum StoreType {
+  FS,
+}
 
 export interface Store {
+  type: StoreType;
+  api: string;
   read: (type: ResourceType, path: string) => Promise<Buffer>;
   readJson: (type: ResourceType, path: string) => Promise<object>;
   path: (type: ResourceType, path: string) => string;
   mapLibreHandler: AssetRequestHandler;
-}
-
-export const enum ResourceType {
-  Style,
-  TileJson,
-  Tile,
-  ApiResource,
+  tileCache: () => string;
+  writeTile: (
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    png: Buffer
+  ) => Promise<void>;
 }
 
 type AssetRequestHandler = (
@@ -24,7 +32,61 @@ type AssetRequestHandler = (
 ) => void;
 
 // TODO: for tiles, we have to read services and tile providers configuration to get cache type and tileset
-export const createStoreFs = (storeDir: string, api: string): Store => {
+export const createStoreFs = async (
+  storeDir: string,
+  api: string,
+  logger: Logger
+): Promise<Store> => {
+  const tileset = "__all__";
+  const providerId = `${api}-tiles`;
+  const provider: any = await getProvider(storeDir, providerId, logger);
+
+  const caches = await getCaches(storeDir, api, provider);
+
+  if (caches.length === 0) {
+    throw new Error(`No seeded tile cache found for provider "${providerId}".`);
+  }
+
+  const cachePaths = caches.reduce((acc, cache) => {
+    acc[`${cache.tms}/${cache.level}`] = cache;
+    return acc;
+  }, {} as any);
+
+  const findCache = (tile: string) => {
+    const key = Object.keys(cachePaths).find((key) => tile.startsWith(key));
+    return key ? cachePaths[key].path : undefined;
+  };
+
+  const findCache2 = (tms: string, z: number) => {
+    const key = Object.keys(cachePaths).find((key) => key === `${tms}/${z}`);
+    return key ? cachePaths[key].path : undefined;
+  };
+
+  //logger.debug(`Provider: ${JSON.stringify(cachePaths, null, 2)}`);
+
+  const writeTile = async (
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    png: Buffer
+  ): Promise<void> => {
+    const cache = findCache2(tms, Math.max(z - 1, 0));
+
+    if (!cache) {
+      throw new Error(`No cache found for tms "${tms}" and level "${z}".`);
+    }
+
+    const tilePath = join(cache, tileset, `${tms}/${z}/${y}/${x}.png`);
+
+    await fs.mkdir(join(cache, tileset, `${tms}/${z}/${y}`), {
+      recursive: true,
+    });
+    await fs.writeFile(tilePath, png);
+
+    logger.debug(`Tile stored at: ${tilePath}`);
+  };
+
   const path: Store["path"] = (type, relPath) => {
     let storePath = relPath;
 
@@ -33,9 +95,15 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
         .replace("{serviceUrl}/tiles/", api + "_")
         .replace("?f=tile", ".");
     } else if (type === ResourceType.Tile) {
-      storePath = storePath
-        .replace("{serviceUrl}/tiles", api + "/cache_dyn/__all__/")
+      const tile = relPath
+        .replace("{serviceUrl}/tiles/", "")
+        .replace("WebMercatorQuad", "merc")
         .replace("?f=", ".");
+      const cache = findCache(tile);
+
+      storePath = cache ? join(cache, tileset, tile) : "";
+
+      return storePath;
     } else if (type === ResourceType.ApiResource) {
       storePath = storePath.replace("{serviceUrl}/resources", api);
     }
@@ -58,7 +126,7 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
   const assets = new Map<string, Buffer>();
 
   const mapLibreHandler: AssetRequestHandler = ({ url, kind }, callback) => {
-    logger.debug(`Map request (kind ${kind}): ${url}`);
+    logger.trace(`Map request (kind ${kind}): ${url}`);
 
     const resourceType = getResourceType(kind);
 
@@ -72,7 +140,7 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
           return;
         }
       }
-      logger.debug(`-> fetch ${url}`);
+      logger.trace(`-> fetch ${url}`);
 
       fetch(url)
         .then((response) => response.arrayBuffer())
@@ -83,7 +151,7 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
       return;
     }
 
-    logger.debug(`-> ${path(resourceType, url)}`);
+    logger.trace(`-> ${path(resourceType, url)}`);
 
     read(resourceType, url)
       .then((data) => {
@@ -91,7 +159,7 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
       })
       .catch((error) => {
         if (error.code === "ENOENT") {
-          logger.warn(`Resource not found: ${url}`);
+          logger.trace(`Resource not found: ${url}`);
           callback();
           return;
         }
@@ -102,36 +170,19 @@ export const createStoreFs = (storeDir: string, api: string): Store => {
       });
   };
 
+  //TODO
+  const tileCache = (): string => {
+    return join(storeDir, "resources/tiles");
+  };
+
   return {
+    type: StoreType.FS,
+    api,
     read,
     readJson,
     path,
     mapLibreHandler,
+    tileCache,
+    writeTile,
   };
-};
-
-const resourceTypeToDir = {
-  [ResourceType.Style]: "values/maplibre-styles",
-  [ResourceType.TileJson]: "resources/tilejson",
-  [ResourceType.Tile]: "resources/tiles",
-  [ResourceType.ApiResource]: "resources/api-resources",
-};
-
-const getResourceType = (kind: ResourceKind): ResourceType => {
-  switch (kind) {
-    case 1:
-      return ResourceType.Style;
-    case 2:
-      return ResourceType.TileJson;
-    case 3:
-      return ResourceType.Tile;
-    case 4:
-      return ResourceType.ApiResource;
-    case 5:
-      return ResourceType.ApiResource;
-    case 6:
-      return ResourceType.ApiResource;
-    default:
-      throw new Error(`Unknown resource kind: ${kind}`);
-  }
 };

@@ -1,6 +1,6 @@
-// Parts of this module are derived from https://github.com/datalyze-solutions/globalmaptiles
+import SphericalMercator from "@mapbox/sphericalmercator";
 
-import { logger } from "./index.js";
+const mercator = new SphericalMercator();
 
 /**
  * Get center of tile [lon, lat]
@@ -9,7 +9,7 @@ import { logger } from "./index.js";
  * @param {number} y - tile row
  * @param {tileSize} tileSize - tile size in pixel
  */
-export const getTileCenter = (
+export const getTileCenterLonLat = (
   zoom: number,
   x: number,
   y: number,
@@ -17,13 +17,9 @@ export const getTileCenter = (
 ): [number, number] => {
   const pxCenterX = x * tileSize + tileSize / 2;
   const pxCenterY = y * tileSize + tileSize / 2;
-  logger.debug(`Center Pixel: ${pxCenterX}, ${pxCenterY}`);
 
-  const centerMeters = pixelsToMeters(pxCenterX, pxCenterY, zoom);
-  logger.debug("Center Meters: " + centerMeters);
+  const center = mercator.ll([pxCenterX, pxCenterY], zoom);
 
-  const center = metersToLatLon(centerMeters[0], centerMeters[1]);
-  logger.debug("Center WGS84: " + center);
   return center;
 };
 
@@ -47,44 +43,13 @@ export const isEdgeTile = (
   if (y == 0 || y == numTiles - 1) {
     isEdgeTile.y = true;
   }
-  logger.debug("Is edge tile: ", isEdgeTile);
+  //logger.debug("Is edge tile: ", isEdgeTile);
 
   return isEdgeTile;
 };
 
-/**
- * Convert coordinates in meters to lon/lat.
- * @param {number} mx - x coordinate (EPSG:3857)
- * @param {number} my - y coordinate (EPSG:3857)
- * @returns
- */
-export const metersToLatLon = (mx: number, my: number): [number, number] => {
-  const originShift = (Math.PI * 2 * 6378137) / 2.0;
-  let lon = (mx / originShift) * 180.0;
-  let lat = (my / originShift) * 180.0;
-  lat =
-    (180 / Math.PI) *
-    (2 * Math.atan(Math.exp((lat * Math.PI) / 180.0)) - Math.PI / 2.0);
-  return [lon, lat];
-};
+export type Bounds = { minX: number; maxX: number; minY: number; maxY: number };
 
-/**
- * Convert coordinates from pixel to meters (EPSG:3857).
- * @param {number} px - x coordinate in pixel
- * @param {number} py - y coordinate in pixel
- * @param {number} zoom - zoom level
- * @returns
- */
-export const pixelsToMeters = (
-  px: number,
-  py: number,
-  zoom: number
-): [number, number] => {
-  const originShift = (Math.PI * 2 * 6378137) / 2.0;
-  var res, mx, my;
-  res = (Math.PI * 2 * 6378137) / 256 / Math.pow(2, zoom);
-  mx = px * res - originShift;
-  my = py * res - originShift;
-  // Invert y axis
-  return [mx, my * -1];
+export const getXyzBounds = (zoom: number, bbox: Bounds): Bounds => {
+  return mercator.xyz([bbox.minX, bbox.minY, bbox.maxX, bbox.maxY], zoom);
 };

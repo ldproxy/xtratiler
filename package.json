@@ -21,7 +21,10 @@
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
+    "@types/js-yaml": "^4.0.9",
+    "@types/mapbox__sphericalmercator": "^1.2.3",
     "@types/node": "^20.12.7",
+    "@types/pretty-time": "^1.1.5",
     "@types/yargs": "^17.0.32",
     "debian-packaging": "^0.1.5",
     "download": "^8.0.0",
@@ -39,10 +42,15 @@
   "dependencies": {
     "@inquirer/confirm": "^3.1.5",
     "@mapbox/jsonlint-lines-primitives": "^2.0.2",
+    "@mapbox/sphericalmercator": "^1.2.0",
     "@maplibre/maplibre-gl-native": "^5.4.0",
     "@maplibre/maplibre-gl-style-spec": "^20.1.1",
+    "filehound": "^1.17.6",
+    "js-yaml": "^4.1.0",
+    "modern-async": "^2.0.0",
     "pino": "^8.20.0",
     "pino-pretty": "^11.0.0",
+    "pretty-time": "^1.1.0",
     "promisify-child-process": "^4.1.2",
     "sharp": "^0.33.3",
     "yargs": "^17.7.2"

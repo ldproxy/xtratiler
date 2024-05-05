@@ -1,4 +1,4 @@
-import { pino } from "pino";
+import { pino, Logger as PinoLogger } from "pino";
 import { build as pretty } from "pino-pretty";
 
 /*const fileTransport = pino.transport({
@@ -13,9 +13,13 @@ const transport = pino.transport({
   ],
 });*/
 
-export const logger = pino(
-  { level: "debug" },
-  pretty({
-    levelFirst: true,
-  })
-);
+export type Logger = PinoLogger<never>;
+
+export const createLogger = (verbose: boolean): Logger =>
+  pino(
+    { level: verbose ? "debug" : "info" },
+    pretty({
+      levelFirst: true,
+      ignore: "pid,hostname",
+    })
+  );

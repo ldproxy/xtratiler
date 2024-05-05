@@ -1,19 +1,22 @@
-import { Argv, Arguments, ArgumentsCamelCase, CommandBuilder } from "yargs";
+import { Argv, ArgumentsCamelCase } from "yargs";
 import confirm from "@inquirer/confirm";
 
 import { JobParameters, render } from "../renderer/index.js";
-import { logger } from "../util/index.js";
+import { createLogger } from "../util/index.js";
 import { GlobalArgs } from "../index.js";
 
 export type RenderArgs = GlobalArgs & {
   style: string;
   store: string;
+  tms: string;
   minZoom: number;
   maxZoom: number;
   minX: number;
   maxX: number;
   minY: number;
   maxY: number;
+  ratio: 1 | 2 | 4 | 8;
+  concurrency: 1 | 2 | 4 | 8 | 16 | 32;
 };
 
 export const command = "render <style>";
@@ -40,6 +43,14 @@ export const builder = (yargs: Argv<{}>) => {
       default: "./",
       group: "Render options:",
     })
+    .option("tms", {
+      alias: "t",
+      type: "string",
+      nargs: 1,
+      description: "tile matrix set",
+      default: "WebMercatorQuad",
+      group: "Render options:",
+    })
     .option("min-zoom", {
       alias: "z",
       type: "number",
@@ -57,7 +68,7 @@ export const builder = (yargs: Argv<{}>) => {
       defaultDescription: "min-zoom",
       group: "Render options:",
     })
-    .option("minx", {
+    .option("min-x", {
       alias: "x",
       type: "number",
       nargs: 1,
@@ -65,7 +76,7 @@ export const builder = (yargs: Argv<{}>) => {
       default: 0,
       group: "Render options:",
     })
-    .option("maxx", {
+    .option("max-x", {
       alias: "X",
       type: "number",
       nargs: 1,
@@ -74,7 +85,7 @@ export const builder = (yargs: Argv<{}>) => {
       defaultDescription: "minx",
       group: "Render options:",
     })
-    .option("miny", {
+    .option("min-y", {
       alias: "y",
       type: "number",
       nargs: 1,
@@ -82,13 +93,31 @@ export const builder = (yargs: Argv<{}>) => {
       default: 0,
       group: "Render options:",
     })
-    .option("maxy", {
+    .option("max-y", {
       alias: "Y",
       type: "number",
       nargs: 1,
       description: "max row",
       default: -1,
       defaultDescription: "miny",
+      group: "Render options:",
+    })
+    .option("ratio", {
+      alias: "r",
+      type: "number",
+      nargs: 1,
+      description: "image pixel ratio",
+      default: 1,
+      choices: [1, 2, 4, 8],
+      group: "Render options:",
+    })
+    .option("concurrency", {
+      alias: "c",
+      type: "number",
+      nargs: 1,
+      description: "number of tiles rendered concurrently",
+      default: 1,
+      choices: [1, 2, 4, 8, 16, 32],
       group: "Render options:",
     })
     .example([
@@ -103,30 +132,29 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const eight = { z: 8, minX: 153, maxX: 154, minY: 102, maxY: 103 };
   const nine = { z: 9, minX: 306, maxX: 308, minY: 205, maxY: 207 };
 
-  //TODO: validate input, parse other
   const job: JobParameters = {
+    id: 1,
     stylePath: argv2.style,
     storePath: argv2.store,
-    ...eight,
-    //TODO: is this defined in the tms? yes
-    size: 256,
-    ratio: 1,
+    tms: argv2.tms,
+    minZ: argv2.minZoom,
+    maxZ: argv2.maxZoom === -1 ? argv2.minZoom : argv2.maxZoom,
+    minX: argv2.minX,
+    maxX: argv2.maxX === -1 ? argv2.minX : argv2.maxX,
+    minY: argv2.minY,
+    maxY: argv2.maxY === -1 ? argv2.minY : argv2.maxY,
+    ratio: argv2.ratio,
+    concurrency: argv2.concurrency,
   };
 
   const proceed = argv.yes || (await confirmRender(job));
 
   if (!proceed) {
-    logger.info("Aborted");
+    console.log("Aborted");
     return;
   }
 
-  if (argv.verbose) {
-    logger.info(`style: ${argv.style}, store: ${argv.store}`);
-  }
-
-  await render(job);
-
-  logger.info("Rendered map");
+  await render(job, createLogger(argv2.verbose));
 };
 
 const confirmRender = async (job: JobParameters) => {

@@ -3,7 +3,7 @@ import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import sharp from "sharp";
 
 import { Store } from "../store/index.js";
-import { logger } from "../util/index.js";
+import { Logger } from "../util/index.js";
 
 type RenderParameters = {
   style: StyleSpecification;
@@ -18,24 +18,20 @@ type RenderParameters = {
 };
 
 export const renderImage = async (
-  params: RenderParameters
+  params: RenderParameters,
+  logger: Logger
 ): Promise<Buffer> => {
   const resizeFactor = 1;
 
-  const img = await renderMapLibre(params);
+  const img = await renderMapLibre(params, logger);
 
-  return await toPNG(img, resizeFactor, params);
+  return await toPNG(img, resizeFactor, params, logger);
 };
 
-const renderMapLibre = async ({
-  style,
-  store,
-  zoom,
-  center,
-  width,
-  height,
-  ratio,
-}: RenderParameters): Promise<Uint8Array> => {
+const renderMapLibre = async (
+  { style, store, zoom, center, width, height, ratio }: RenderParameters,
+  logger: Logger
+): Promise<Uint8Array> => {
   const map = new mapLibre.Map({
     request: store.mapLibreHandler.bind(store),
     ratio,
@@ -45,25 +41,24 @@ const renderMapLibre = async ({
 
   map.load(style);
 
-  const imgBuffer = await renderMapLibrePromise(map, {
+  const options: RenderOptions = {
     zoom,
     center,
     width,
     height,
     bearing: 0,
     pitch: 0,
-  });
+  };
 
-  return imgBuffer;
+  logger.debug("Rendering using MapLibre with options: %o", options);
+
+  return await renderMapLibrePromise(map, options);
 };
 
 const renderMapLibrePromise = async (
   map: Map,
   options: RenderOptions
 ): Promise<Uint8Array> => {
-  logger.debug(
-    "Render map with options: \n" + JSON.stringify(options, null, 2)
-  );
   return new Promise((resolve, reject) => {
     map.render(options, (error, buffer) => {
       try {
@@ -95,7 +90,8 @@ const renderMapLibrePromise = async (
 const toPNG = async (
   imgBuffer: Uint8Array,
   resizeFactor: number,
-  { width, height, bufferX, bufferY, ratio }: RenderParameters
+  { width, height, bufferX, bufferY, ratio }: RenderParameters,
+  logger: Logger
 ): Promise<Buffer> => {
   // Un-premultiply pixel values
   // Mapbox GL buffer contains premultiplied values, which are not handled correctly by sharp
@@ -103,7 +99,7 @@ const toPNG = async (
   // since we are dealing with 8-bit RGBA values, normalize alpha onto 0-255 scale and divide
   // it out of RGB values
 
-  logger.debug("Convert image buffer to png");
+  logger.trace("Convert image buffer to png");
 
   for (let i = 0; i < imgBuffer.length; i += 4) {
     const alpha = imgBuffer[i + 3];
@@ -129,7 +125,7 @@ const toPNG = async (
 
   // Remove buffer
   if (bufferX > 0 || bufferY > 0) {
-    logger.debug(
+    logger.trace(
       `Extract image from buffer with width ${
         width * ratio - bufferX * ratio * 2
       } and height ${height * ratio - bufferY * ratio * 2}`
@@ -144,7 +140,7 @@ const toPNG = async (
 
   // Resize image (for zoom 0)
   if (resizeFactor != 1) {
-    logger.debug(
+    logger.trace(
       `Resize image to width ${width * ratio * resizeFactor} and height ${
         height * ratio * resizeFactor
       }`
