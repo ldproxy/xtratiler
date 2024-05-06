@@ -4,10 +4,11 @@ import sharp from "sharp";
 
 import { Store } from "../store/index.js";
 import { Logger } from "../util/index.js";
+import { AssetReader } from "../store/assets.js";
 
 type RenderParameters = {
+  assetReader: AssetReader;
   style: StyleSpecification;
-  store: Store;
   zoom: number;
   center: [number, number];
   width: number;
@@ -29,11 +30,12 @@ export const renderImage = async (
 };
 
 const renderMapLibre = async (
-  { style, store, zoom, center, width, height, ratio }: RenderParameters,
+  { style, assetReader, zoom, center, width, height, ratio }: RenderParameters,
   logger: Logger
 ): Promise<Uint8Array> => {
+  //TODO: only create on Map per job?
   const map = new mapLibre.Map({
-    request: store.mapLibreHandler.bind(store),
+    request: assetReader,
     ratio,
   });
 
@@ -50,7 +52,7 @@ const renderMapLibre = async (
     pitch: 0,
   };
 
-  logger.debug("Rendering using MapLibre with options: %o", options);
+  logger.trace("Rendering using MapLibre with options: %o", options);
 
   return await renderMapLibrePromise(map, options);
 };

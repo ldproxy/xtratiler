@@ -9,8 +9,7 @@ export type RenderArgs = GlobalArgs & {
   style: string;
   store: string;
   tms: string;
-  minZoom: number;
-  maxZoom: number;
+  zoom: number;
   minX: number;
   maxX: number;
   minY: number;
@@ -51,21 +50,12 @@ export const builder = (yargs: Argv<{}>) => {
       default: "WebMercatorQuad",
       group: "Render options:",
     })
-    .option("min-zoom", {
+    .option("zoom", {
       alias: "z",
       type: "number",
       nargs: 1,
-      description: "min zoom level",
+      description: "zoom level",
       default: 0,
-      group: "Render options:",
-    })
-    .option("max-zoom", {
-      alias: "Z",
-      type: "number",
-      nargs: 1,
-      description: "max zoom level",
-      default: -1,
-      defaultDescription: "min-zoom",
       group: "Render options:",
     })
     .option("min-x", {
@@ -119,11 +109,11 @@ export const builder = (yargs: Argv<{}>) => {
       default: 1,
       choices: [1, 2, 4, 8, 16, 32],
       group: "Render options:",
-    })
-    .example([
+    });
+  /*.example([
       ['$0 --config "~/config.json"', "Use custom config"],
       ["$0 --safe", "Start in safe mode"],
-    ]);
+    ])*/
 };
 
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
@@ -136,9 +126,9 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     id: 1,
     stylePath: argv2.style,
     storePath: argv2.store,
-    tms: argv2.tms,
-    minZ: argv2.minZoom,
-    maxZ: argv2.maxZoom === -1 ? argv2.minZoom : argv2.maxZoom,
+    tileset: "__all__",
+    tmsId: argv2.tms,
+    z: argv2.zoom,
     minX: argv2.minX,
     maxX: argv2.maxX === -1 ? argv2.minX : argv2.maxX,
     minY: argv2.minY,
@@ -158,7 +148,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
 };
 
 const confirmRender = async (job: JobParameters) => {
-  console.log("Render job summary:");
+  console.log("Submitting rendering job:");
   console.log(job);
   console.log();
 

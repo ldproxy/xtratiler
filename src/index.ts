@@ -22,7 +22,7 @@ const cli = yargs(hideBin(process.argv))
   .option("yes", {
     type: "boolean",
     description: "Do not ask for confirmation",
-  })
-  .epilogue("for more information, find our manual at http://example.com");
+  });
+/*.epilogue("for more information, find our manual at http://example.com")*/
 
 cli.wrap(Math.min(100, cli.terminalWidth())).parse();
