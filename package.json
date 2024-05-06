@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "build": "node build.js",
-    "start": "npm run build && node ./build/index.cjs",
+    "start": "npm run build && node ./build/bin/index.cjs",
     "dev": "tsx ./src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rimraf build && rimraf dist",

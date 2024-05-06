@@ -30,7 +30,7 @@ if (process.argv[2] === "--pre") {
   await copy(join(__dirname, "build/lib"), join(__dirname, "dist/app/lib"));
 
   await fs.writeJSON(seaCfg, {
-    main: join(build, "index.cjs"),
+    main: join(build, "bin/index.cjs"),
     output: join(build, "sea-prep.blob"),
     disableExperimentalSEAWarning: true,
   });

@@ -36,7 +36,7 @@ await fs.writeFile(
   `#!/bin/bash\nLD_LIBRARY_PATH="${join(
     distDebTarget,
     "lib/debian"
-  )}" /opt/xtraserver/webapi/bin/xtratiler $@\n`,
+  )}" xvfb-run -a /opt/xtraserver/webapi/bin/xtratiler $@\n`,
   { mode: 0o755 }
 );
 
@@ -48,7 +48,7 @@ const control = {
   Maintainer: {
     Name: pkg.author,
   },
-  Depends: ["libglx0", "libopengl0", "libuv1", "libcurl4", "libwebp7"],
+  Depends: ["libglx0", "libopengl0", "libuv1", "libcurl4", "libwebp7", "xvfb"],
 };
 
 console.log("Creating package...", pkgDeb, distDebData, control);

@@ -19,13 +19,14 @@ await build({
   platform: "node",
   target: "node20",
   format: "cjs",
+  minify: true,
   //logLevel: "debug",
   /*loader: {
     ".node": "copy",
   },*/
   outdir: "build",
   outbase: "node_modules",
-  entryNames: "[name]",
+  entryNames: "bin/[name]",
   assetNames: "lib/[dir]/[name]",
   outExtension: {
     ".js": ".cjs",
@@ -47,6 +48,9 @@ await build({
         "${runtimePlatform}": platform,
         "/mbgl": "/mbgl.node",
         "if (sharp) {": `sharp = require2('../lib/@img/sharp-${platform}/lib/sharp-${platform}.node'); if (sharp) {`,
+        "require('bindings')('node_sqlite3.node')":
+          "require2('../lib/sqlite3/build/Release/node_sqlite3.node')",
+        "./schema.sql": "../lib/@mapbox/mbtiles/lib/schema.sql",
       },
     }),
     copy({
@@ -62,6 +66,14 @@ await build({
             "./node_modules/@img/**/*.so.42",
           ],
           to: ["./lib/@img"],
+        },
+        {
+          from: ["./node_modules/sqlite3/**/*.node"],
+          to: ["./lib/sqlite3"],
+        },
+        {
+          from: ["./node_modules/@mapbox/**/*.sql"],
+          to: ["./lib/@mapbox"],
         },
       ],
     }),
