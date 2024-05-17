@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
 import { Logger } from "../util/index.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
@@ -71,7 +71,7 @@ export const createStoreFs = async (
         `${tms}/${z}/${y}/${x}.png`
       );
 
-      await fs.mkdir(join(cache.path, styleTileset, `${tms}/${z}/${y}`), {
+      await fs.mkdir(dirname(tilePath), {
         recursive: true,
       });
       await fs.writeFile(tilePath, png);
@@ -81,6 +81,10 @@ export const createStoreFs = async (
     }
 
     const tilePath = join(cache.path, styleTileset, `${tms}.mbtiles`);
+
+    await fs.mkdir(dirname(tilePath), {
+      recursive: true,
+    });
 
     const mbt = await getMbtiles(tilePath, true);
 
