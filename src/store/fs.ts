@@ -54,7 +54,8 @@ export const createStoreFs = async (
     z: number,
     x: number,
     y: number,
-    png: Buffer
+    png: Buffer,
+    forceXyz: boolean
   ): Promise<void> => {
     const cache = findCache4(tms, Math.max(z - 1, 0));
 
@@ -86,7 +87,7 @@ export const createStoreFs = async (
       recursive: true,
     });
 
-    const mbt = await getMbtiles(tilePath, true);
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
 
     logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
 
@@ -149,13 +150,14 @@ export const createStoreFs = async (
 
   const getMbtiles = async (
     path: string,
-    writable?: boolean
+    writable?: boolean,
+    forceXyz?: boolean
   ): Promise<MBTiles> => {
     if (mbtiles.has(path)) {
       return mbtiles.get(path) as MBTiles;
     }
 
-    const mbt = await openMbtiles(path, writable);
+    const mbt = await openMbtiles(path, writable, forceXyz);
     mbtiles.set(path, mbt);
 
     if (writable) {

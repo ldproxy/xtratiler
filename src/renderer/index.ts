@@ -24,6 +24,7 @@ export type JobParameters = {
   maxY: number;
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
+  mbtilesForceXyz: boolean;
 };
 
 type Progress = {

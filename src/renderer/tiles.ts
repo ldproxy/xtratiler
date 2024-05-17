@@ -33,7 +33,7 @@ const renderTile = async (
   x: number,
   y: number,
   assetReader: AssetReader,
-  { style, store, tms, ratio, logger }: JobContext
+  { style, store, tms, ratio, mbtilesForceXyz, logger }: JobContext
 ) => {
   logger.debug(
     `Rendering tile ${z}/${x}/${y} with size ${tms.tileSize * ratio}px`
@@ -59,7 +59,7 @@ const renderTile = async (
       logger
     );
 
-    await store.writeTile(style.id, tms.name, z, x, y, png);
+    await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
   } catch (e) {
     logger.warn("Error rendering tile %s/%s/%s: %s", z, x, y, e);
   }

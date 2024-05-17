@@ -16,6 +16,7 @@ export type RenderArgs = GlobalArgs & {
   maxY: number;
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
+  mbtilesForceXyz: boolean;
 };
 
 export const command = "render <style>";
@@ -109,6 +110,13 @@ export const builder = (yargs: Argv<{}>) => {
       default: 1,
       choices: [1, 2, 4, 8, 16, 32],
       group: "Render options:",
+    })
+    .option("mbtiles-force-xyz", {
+      type: "boolean",
+      default: false,
+      description:
+        "when writing to mbtiles, use XYZ instead of TMS tiling scheme",
+      group: "Render options:",
     });
   /*.example([
       ['$0 --config "~/config.json"', "Use custom config"],
@@ -118,9 +126,6 @@ export const builder = (yargs: Argv<{}>) => {
 
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<RenderArgs>;
-
-  const eight = { z: 8, minX: 153, maxX: 154, minY: 102, maxY: 103 };
-  const nine = { z: 9, minX: 306, maxX: 308, minY: 205, maxY: 207 };
 
   const job: JobParameters = {
     id: 1,
@@ -135,6 +140,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     maxY: argv2.maxY === -1 ? argv2.minY : argv2.maxY,
     ratio: argv2.ratio,
     concurrency: argv2.concurrency,
+    mbtilesForceXyz: argv2.mbtilesForceXyz,
   };
 
   const proceed = argv.yes || (await confirmRender(job));

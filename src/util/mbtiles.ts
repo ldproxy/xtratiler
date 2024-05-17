@@ -11,7 +11,8 @@ export type MBTiles = {
 
 export const openMbtiles = async (
   mbtilesFile: string,
-  writable?: boolean
+  writable?: boolean,
+  forceXyz?: boolean
 ): Promise<MBTiles> => {
   return new Promise((resolve, reject) => {
     new MBTilesOrig(mbtilesFile, (err: any, mbtiles: any) => {
@@ -25,16 +26,20 @@ export const openMbtiles = async (
             return reject(err2);
           }
 
-          return resolve(wrap(mbtiles, writable));
+          return resolve(wrap(mbtiles, true, forceXyz));
         });
       }
 
-      return resolve(wrap(mbtiles, writable));
+      return resolve(wrap(mbtiles, false, false));
     });
   });
 };
 
-const wrap = (mbtiles: any, writable: boolean | undefined): MBTiles => ({
+const wrap = (
+  mbtiles: any,
+  writable: boolean | undefined,
+  forceXyz: boolean | undefined
+): MBTiles => ({
   getTile: (z: number, x: number, y: number) => {
     return new Promise((resolve, reject) => {
       mbtiles.getTile(z, x, y, (err: any, data: any, headers: any) => {
@@ -68,7 +73,9 @@ const wrap = (mbtiles: any, writable: boolean | undefined): MBTiles => ({
   },
   putTile: (z: number, x: number, y: number, buffer: Buffer) => {
     return new Promise((resolve, reject) => {
-      mbtiles.putTile(z, x, y, buffer, (err: any) => {
+      const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
+
+      mbtiles.putTile(z, x, row, buffer, (err: any) => {
         if (err) {
           return reject(err);
         }
@@ -79,13 +86,17 @@ const wrap = (mbtiles: any, writable: boolean | undefined): MBTiles => ({
   },
   putInfo: (data: Buffer) => {
     return new Promise((resolve, reject) => {
-      mbtiles.putInfo(data, (err: any) => {
-        if (err) {
-          return reject(err);
-        }
+      mbtiles.putInfo(
+        //TODO: overwritten by @mapbox/mbtiles
+        { ...data, scheme: forceXyz ? "xyz" : "tms" },
+        (err: any) => {
+          if (err) {
+            return reject(err);
+          }
 
-        return resolve();
-      });
+          return resolve();
+        }
+      );
     });
   },
   close: () => {

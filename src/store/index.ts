@@ -18,7 +18,8 @@ export interface Store {
     z: number,
     x: number,
     y: number,
-    png: Buffer
+    png: Buffer,
+    forceXyz: boolean
   ) => Promise<void>;
   close: () => Promise<void>;
 }
