@@ -14,7 +14,8 @@ const distApp = join(dist, "app");
 const distDebCtrl = join(dist, "deb/ctrl");
 const distDebData = join(dist, "deb/data");
 const distDebLib = join(dist, "deb/lib");
-const distDebTarget = join(distDebData, "opt/xtraserver/webapi");
+const distDebInstallDir = "/opt/xtraserver/webapi";
+const distDebTarget = join(distDebData, distDebInstallDir);
 const pkgDeb = join(dist, `${pkg.name}_${pkg.version}-1_amd64.deb`);
 
 await ensureDir(distDebCtrl);
@@ -34,7 +35,7 @@ await copy(
 await fs.writeFile(
   join(distDebTarget, "bin/xt"),
   `#!/bin/bash\nLD_LIBRARY_PATH="${join(
-    distDebTarget,
+    distDebInstallDir,
     "lib/debian"
   )}" xvfb-run -a /opt/xtraserver/webapi/bin/xtratiler $@\n`,
   { mode: 0o755 }
