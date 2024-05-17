@@ -15,9 +15,11 @@ const transport = pino.transport({
 
 export type Logger = PinoLogger<never>;
 
-export const createLogger = (verbose: boolean): Logger =>
+export const createLogger = (verboseLevel: number): Logger =>
   pino(
-    { level: verbose ? "debug" : "info" },
+    {
+      level: verboseLevel >= 2 ? "trace" : verboseLevel == 1 ? "debug" : "info",
+    },
     pretty({
       levelFirst: true,
       ignore: "pid,hostname",

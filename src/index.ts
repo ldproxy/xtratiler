@@ -3,7 +3,7 @@ import { hideBin } from "yargs/helpers";
 import cmds from "./cmd/index.js";
 
 export type GlobalArgs = {
-  verbose: boolean;
+  verbose: number;
   yes: boolean;
 };
 
@@ -16,7 +16,7 @@ const cli = yargs(hideBin(process.argv))
   .alias("help", "h")
   .option("verbose", {
     alias: "v",
-    type: "boolean",
+    type: "count",
     description: "Run with verbose logging",
   })
   .option("yes", {
