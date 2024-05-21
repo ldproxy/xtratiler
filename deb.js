@@ -34,7 +34,7 @@ await copy(
 
 await fs.writeFile(
   join(distDebTarget, "bin/xt"),
-  `#!/bin/bash\nLD_LIBRARY_PATH="${join(
+  `#!/bin/bash\nNODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt LD_LIBRARY_PATH="${join(
     distDebInstallDir,
     "lib/debian"
   )}" xvfb-run -a /opt/xtraserver/webapi/bin/xtratiler $@\n`,
