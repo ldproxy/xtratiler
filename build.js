@@ -2,6 +2,7 @@ import { build } from "esbuild";
 import { clean } from "esbuild-plugin-clean";
 import { replace } from "esbuild-plugin-replace";
 import { copy } from "esbuild-plugin-copy";
+import pkg from "./package.json" assert { type: "json" };
 
 const platform = `${process.platform}-${process.arch}`;
 const nodeVersion = process.versions.node.split(".")[0];
@@ -35,6 +36,9 @@ await build({
     //js: "import { createRequire } from 'module';const require = createRequire(import.meta.url);",
     js: "const require2 = require('node:sea').isSea() ? require('node:module').createRequire(__filename) : require;",
   },
+  define: {
+    "process.env.NODE_ENV": '"production"',
+  },
   plugins: [
     clean({
       patterns: ["./build/*"],
@@ -51,6 +55,7 @@ await build({
         "require('bindings')('node_sqlite3.node')":
           "require2('../lib/sqlite3/build/Release/node_sqlite3.node')",
         "./schema.sql": "../lib/@mapbox/mbtiles/lib/schema.sql",
+        $$VERSION$$: pkg.version,
       },
     }),
     copy({

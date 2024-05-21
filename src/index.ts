@@ -7,6 +7,8 @@ export type GlobalArgs = {
   yes: boolean;
 };
 
+const version = process.env.NODE_ENV === "production" ? "$$VERSION$$" : "DEV";
+
 const cli = yargs(hideBin(process.argv))
   .scriptName("xtratiler")
   .strict()
@@ -14,6 +16,7 @@ const cli = yargs(hideBin(process.argv))
   .demandCommand(1, "")
   .command(cmds)
   .alias("help", "h")
+  .version(version)
   .option("verbose", {
     alias: "v",
     type: "count",
