@@ -1,7 +1,7 @@
 when:
   event: push
 
-pipeline:
+steps:
   docker:
     image: woodpeckerci/plugin-docker-buildx
     # TODO: see https://codeberg.org/woodpecker-plugins/docker-buildx/issues/50
@@ -22,3 +22,4 @@ pipeline:
             from_secret: ghcr_username
           password:
             from_secret: ghcr_password
+
