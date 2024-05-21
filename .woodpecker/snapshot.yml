@@ -22,4 +22,3 @@ steps:
             from_secret: ghcr_username
           password:
             from_secret: ghcr_password
-
