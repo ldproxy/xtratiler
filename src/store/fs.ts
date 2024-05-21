@@ -138,6 +138,10 @@ export const createStoreFs = async (
     const tile = relPath.split("/");
     const zyx = tile.slice(1).map((d) => parseInt(d));
 
+    const tilePath = join(cache.path, tileset, `${tile[0]}.mbtiles`);
+
+    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+
     const mbt = await getMbtiles(
       join(cache.path, tileset, `${tile[0]}.mbtiles`)
     );

@@ -15,7 +15,7 @@ export const createAssetReader = (
   const assets = new Map<string, Buffer>();
 
   return ({ url, kind }, callback) => {
-    logger.trace(`MapLibre request (kind ${kind}): ${url}`);
+    logger.trace(`MapLibre resource request (kind ${kind}): ${url}`);
 
     const resourceType = getResourceType(kind);
 
@@ -50,7 +50,7 @@ export const createAssetReader = (
       relPath = url.replace("{serviceUrl}/resources", store.api);
     }
 
-    logger.trace(`-> ${store.path(resourceType, relPath)}`);
+    logger.trace(`-> store ${store.path(resourceType, relPath)}`);
 
     store
       .read(resourceType, relPath)
@@ -63,7 +63,7 @@ export const createAssetReader = (
       })
       .catch((error) => {
         if (error.code === "ENOENT") {
-          logger.trace(`Resource not found: ${url}`);
+          logger.trace(`MapLibre resource not found: ${url}`);
           callback();
           return;
         }
