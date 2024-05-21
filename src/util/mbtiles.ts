@@ -14,8 +14,10 @@ export const openMbtiles = async (
   writable?: boolean,
   forceXyz?: boolean
 ): Promise<MBTiles> => {
+  const mode = `?mode=${writable ? "rwc" : "ro"}`;
+
   return new Promise((resolve, reject) => {
-    new MBTilesOrig(mbtilesFile, (err: any, mbtiles: any) => {
+    new MBTilesOrig(mbtilesFile + mode, (err: any, mbtiles: any) => {
       if (err) {
         return reject(err);
       }
