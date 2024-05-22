@@ -1,14 +1,29 @@
-FROM node:20-slim
+FROM node:20 as builder
 
-RUN apt-get update && apt-get install -y \
-    wget \
- && rm -rf /var/lib/apt/lists/*
+COPY . /src
 
-RUN wget -q -O /tmp/xtratiler.deb https://github.com/ldproxy/xtratiler/releases/download/v0.9.2/xtratiler_0.9.2-1_amd64.deb  \
-  && apt-get update && apt-get install -y /tmp/xtratiler.deb \
-  && rm /tmp/xtratiler.deb \
-  && rm -rf /var/lib/apt/lists/*
+RUN cd /src && npm ci && npm run docker
+
+
+
+FROM ubuntu:22.04
+
+COPY --from=builder /src/dist/app /app 
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && DEBIAN_FRONTEND="noninteractive" TZ="Europe/Berlin" apt-get install -y \
+    tzdata \
+    libcurl4 \
+    libgl1-mesa-glx \
+    libwebp7 \
+    libpng16-16 \
+    libjpeg-turbo8 \
+    libopengl0 \
+    libuv1 \
+    libicu70 \
+    xvfb
 
 WORKDIR /store
 
-ENTRYPOINT ["/opt/xtraserver/webapi/bin/xt"]
+ENTRYPOINT ["/app/bin/xt"]
