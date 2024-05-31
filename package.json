@@ -7,6 +7,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "v": "node --version",
     "build": "node build.js",
     "start": "npm run build && node ./build/bin/index.cjs",
     "dev": "tsx ./src/index.ts",
@@ -34,6 +35,7 @@
     "esbuild-plugin-copy": "^2.1.1",
     "esbuild-plugin-replace": "^1.4.0",
     "fs-extra": "^11.2.0",
+    "node": "^20.13.1",
     "postject": "^1.0.0-alpha.6",
     "rimraf": "^5.0.5",
     "tsx": "^4.7.2",
