@@ -11,10 +11,6 @@ export const adjustStyle = (
   style: StyleSpecification,
   tms: TileMatrixSet
 ): StyleSpecification => {
-  if (tms.name === "WebMercatorQuad") {
-    return style;
-  }
-
   const adjusted = {
     ...style,
     metadata: undefined,
