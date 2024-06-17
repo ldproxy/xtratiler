@@ -1,6 +1,6 @@
 {
   "name": "xtratiler",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "raster tile renderer for ldproxy",
   "author": "interactive instruments GmbH",
   "license": "MIT",
