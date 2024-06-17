@@ -136,7 +136,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<RenderArgs>;
 
   const job: JobParameters = {
-    id: 1,
+    id: "1",
     stylePath: argv2.style,
     storePath: argv2.store,
     tileset: "__all__",

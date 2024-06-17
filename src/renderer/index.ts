@@ -12,7 +12,7 @@ import { ResourceType } from "../store/common.js";
 import { renderTiles } from "./tiles.js";
 
 export type JobParameters = {
-  id: number;
+  id: string;
   stylePath: string;
   storePath: string;
   tileset: string;
@@ -29,7 +29,7 @@ export type JobParameters = {
 };
 
 type Progress = {
-  jobId: number;
+  jobId: string;
   started: [number, number];
   total: number;
   current: number;

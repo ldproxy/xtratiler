@@ -19,6 +19,15 @@ const findEntityPath = async (
   return filehound.create().paths(entityPaths).match(`${entityId}.yml`).find();
 };
 
+export const findEntityPaths = async (storeDir: string): Promise<string[]> => {
+  const entityPaths = [
+    join(storeDir, `entities/instances`),
+    join(storeDir, `store/entities`),
+  ].filter(fss.existsSync);
+
+  return filehound.create().paths(entityPaths).match(`*-tiles.yml`).find();
+};
+
 export const getProvider = async (
   storeDir: string,
   id: string,
@@ -33,6 +42,13 @@ export const getProvider = async (
   logger.debug(`Tile provider: ${providerFile[0]}`);
 
   const providerYaml = await fs.readFile(providerFile[0], "utf8");
+  const provider: any = yaml.load(providerYaml);
+
+  return provider;
+};
+
+export const getProviderByPath = async (providerFile: string): Promise<any> => {
+  const providerYaml = await fs.readFile(providerFile, "utf8");
   const provider: any = yaml.load(providerYaml);
 
   return provider;
