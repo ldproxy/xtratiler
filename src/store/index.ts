@@ -37,10 +37,11 @@ export const createStore = async (
   storeLocation: string,
   api: string,
   tileset: string,
+  storageHint: string | undefined,
   logger: Logger
 ): Promise<Store> => {
   if (type === StoreType.FS) {
-    return createStoreFs(storeLocation, api, tileset, logger);
+    return createStoreFs(storeLocation, api, tileset, storageHint, logger);
   }
 
   throw new Error(`Unsupported store type: ${type}`);

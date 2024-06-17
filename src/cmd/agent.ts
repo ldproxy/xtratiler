@@ -111,8 +111,6 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     }
   }
 
-  console.log(agent);
-
   readFromQueue(agent)
     .then(() => agent.logger.info("Disconnected from job queue"))
     .catch((err) => agent.logger.error(err));
@@ -201,6 +199,8 @@ const processJob = async (agent: Agent, job: any) => {
     concurrency: agent.concurrencyEnabled ? 1 : agent.concurrency,
     overwrite: job.details.reseed,
     mbtilesForceXyz: false,
+    storageHint: agent.concurrencyEnabled ? job.details.storageHint : undefined,
+    agent: true,
   };
 
   agent.logger.debug("Submitting rendering job: %o", job2);

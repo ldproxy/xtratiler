@@ -26,6 +26,8 @@ export type JobParameters = {
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   overwrite: boolean;
   mbtilesForceXyz: boolean;
+  storageHint: string | undefined;
+  agent: boolean;
 };
 
 type Progress = {
@@ -70,6 +72,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
       storePath,
       stylePath.substring(0, stylePath.indexOf("/")),
       tileset,
+      parameters.agent ? parameters.storageHint : "detect",
       logger
     );
     store2 = store;

@@ -10,6 +10,7 @@ export const createStoreFs = async (
   storeDir: string,
   api: string,
   tileset: string,
+  storageHint: string | undefined,
   logger: Logger
 ): Promise<Store> => {
   const providerId = `${api}-tiles`;
@@ -20,6 +21,21 @@ export const createStoreFs = async (
   if (caches.length === 0) {
     throw new Error(`No seeded tile cache found for provider "${providerId}".`);
   }
+
+  const jobSizeLetter = (provider.seeding && provider.seeding.jobSize) || "M";
+  const perJob =
+    storageHint === "detect"
+      ? caches.every((cache) => cache.storage === "PER_JOB")
+      : !!storageHint;
+  const jobSize = !perJob
+    ? 0
+    : jobSizeLetter === "S"
+    ? 256
+    : jobSizeLetter === "L"
+    ? 16384
+    : jobSizeLetter === "XL"
+    ? 65536
+    : 1024;
 
   const cachePaths = caches.reduce((acc, cache) => {
     acc[`${cache.tms}/${cache.level}`] = cache;
@@ -81,7 +97,12 @@ export const createStoreFs = async (
       return;
     }
 
-    const tilePath = join(cache.path, styleTileset, `${tms}.mbtiles`);
+    const mbtilesName =
+      jobSize > 0
+        ? `${tms}/${getPartition(z, x, y)}.mbtiles`
+        : `${tms}.mbtiles`;
+
+    const tilePath = join(cache.path, styleTileset, mbtilesName);
 
     await fs.mkdir(dirname(tilePath), {
       recursive: true,
@@ -129,7 +150,12 @@ export const createStoreFs = async (
       return exists;
     }
 
-    const tilePath = join(cache.path, styleTileset, `${tms}.mbtiles`);
+    const mbtilesName =
+      jobSize > 0
+        ? `${tms}/${getPartition(z, x, y)}.mbtiles`
+        : `${tms}.mbtiles`;
+
+    const tilePath = join(cache.path, styleTileset, mbtilesName);
 
     let exists = false;
 
@@ -181,6 +207,25 @@ export const createStoreFs = async (
       });
   };
 
+  const singleRowCol = jobSize > 0 ? Math.sqrt(jobSize) : 0;
+  const singlePartitionLevel =
+    jobSize > 0 ? Math.log(singleRowCol) / Math.log(2) : 0;
+
+  const getPartition = (z: number, x: number, y: number): string => {
+    if (z <= singlePartitionLevel) {
+      return `${z}`;
+    }
+
+    const rowPartition = Math.floor(y / singleRowCol);
+    const colPartition = Math.floor(x / singleRowCol);
+    const rowMin = rowPartition * singleRowCol;
+    const rowMax = (rowPartition + 1) * singleRowCol - 1;
+    const colMin = colPartition * singleRowCol;
+    const colMax = (colPartition + 1) * singleRowCol - 1;
+
+    return `${z}_${rowMin}-${rowMax}_${colMin}-${colMax}`;
+  };
+
   const readTile = async (relPath: string) => {
     const cache = findCache3(relPath);
 
@@ -194,17 +239,26 @@ export const createStoreFs = async (
 
     const tile = relPath.split("/");
     const zyx = tile.slice(1).map((d) => parseInt(d));
+    const mbtilesName =
+      jobSize > 0
+        ? `${tile[0]}/${getPartition(zyx[0], zyx[2], zyx[1])}.mbtiles`
+        : `${tile[0]}.mbtiles`;
 
-    const tilePath = join(cache.path, tileset, `${tile[0]}.mbtiles`);
+    const tilePath = join(cache.path, tileset, mbtilesName);
 
     logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+    try {
+      const mbt = await getMbtiles(tilePath);
 
-    const mbt = await getMbtiles(
-      join(cache.path, tileset, `${tile[0]}.mbtiles`)
-    );
+      //TODO
+      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
+    } catch (err) {
+      if (perJob) {
+        return undefined;
+      }
 
-    //TODO
-    return mbt.getTile(zyx[0], zyx[2], zyx[1]);
+      throw err;
+    }
   };
 
   const mbtiles = new Map<string, MBTiles>();

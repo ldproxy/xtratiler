@@ -150,6 +150,8 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     concurrency: argv2.concurrency,
     overwrite: argv2.overwrite,
     mbtilesForceXyz: argv2.mbtilesForceXyz,
+    storageHint: undefined,
+    agent: false,
   };
 
   const proceed = argv.yes || (await confirmRender(job));
