@@ -16,6 +16,7 @@ export type RenderArgs = GlobalArgs & {
   maxY: number;
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
+  overwrite: boolean;
   mbtilesForceXyz: boolean;
 };
 
@@ -111,6 +112,13 @@ export const builder = (yargs: Argv<{}>) => {
       choices: [1, 2, 4, 8, 16, 32],
       group: "Render options:",
     })
+    .option("overwrite", {
+      alias: "o",
+      type: "boolean",
+      default: false,
+      description: "overwrite existing tiles instead of skipping them",
+      group: "Render options:",
+    })
     .option("mbtiles-force-xyz", {
       type: "boolean",
       default: false,
@@ -140,6 +148,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     maxY: argv2.maxY === -1 ? argv2.minY : argv2.maxY,
     ratio: argv2.ratio,
     concurrency: argv2.concurrency,
+    overwrite: argv2.overwrite,
     mbtilesForceXyz: argv2.mbtilesForceXyz,
   };
 

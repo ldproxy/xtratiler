@@ -4,6 +4,7 @@ import zlib from "node:zlib";
 export type MBTiles = {
   getTile: (z: number, x: number, y: number) => Promise<Buffer>;
   getInfo: () => Promise<any>;
+  hasTile: (z: number, x: number, y: number) => Promise<boolean>;
   putTile: (z: number, x: number, y: number, buffer: Buffer) => Promise<void>;
   putInfo: (data: any) => Promise<void>;
   close: () => Promise<void>;
@@ -70,6 +71,19 @@ const wrap = (
         }
 
         return resolve(info);
+      });
+    });
+  },
+  hasTile: (z: number, x: number, y: number) => {
+    return new Promise((resolve, reject) => {
+      const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
+
+      mbtiles.getTile(z, x, row, (err: any) => {
+        if (err) {
+          return resolve(false);
+        }
+
+        return resolve(true);
       });
     });
   },

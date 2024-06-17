@@ -12,6 +12,14 @@ export interface Store {
   read: (type: ResourceType, path: string) => Promise<Buffer>;
   readJson: (type: ResourceType, path: string) => Promise<object>;
   path: (type: ResourceType, path: string) => string;
+  hasTile: (
+    styleId: string,
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    forceXyz: boolean
+  ) => Promise<boolean>;
   writeTile: (
     styleId: string,
     tms: string,

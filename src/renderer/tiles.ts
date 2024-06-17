@@ -33,8 +33,24 @@ const renderTile = async (
   x: number,
   y: number,
   assetReader: AssetReader,
-  { style, store, tms, ratio, mbtilesForceXyz, logger }: JobContext
+  { style, store, tms, ratio, overwrite, mbtilesForceXyz, logger }: JobContext
 ) => {
+  if (!overwrite) {
+    const exists = await store.hasTile(
+      style.id,
+      tms.name,
+      z,
+      x,
+      y,
+      mbtilesForceXyz
+    );
+
+    if (exists) {
+      logger.debug(`Tile ${z}/${x}/${y} already exists, skipping`);
+      return;
+    }
+  }
+
   logger.debug(
     `Rendering tile ${z}/${x}/${y} with size ${tms.tileSize * ratio}px`
   );

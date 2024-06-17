@@ -94,6 +94,63 @@ export const createStoreFs = async (
     await mbt.putTile(z, x, y, png);
   };
 
+  const hasTile = async (
+    styleId: string,
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    forceXyz: boolean
+  ): Promise<boolean> => {
+    const cache = findCache4(tms, Math.max(z - 1, 0));
+
+    if (!cache) {
+      throw new Error(`No cache found for tms "${tms}" and level "${z}".`);
+    }
+
+    const styleTileset = `${tileset}_${styleId}`;
+
+    if (cache.storage === "PLAIN") {
+      const tilePath = join(
+        cache.path,
+        styleTileset,
+        `${tms}/${z}/${y}/${x}.png`
+      );
+
+      let exists = false;
+
+      try {
+        await fs.access(tilePath, fs.constants.F_OK);
+        exists = true;
+      } catch (err) {
+        // Handle error
+      }
+
+      return exists;
+    }
+
+    const tilePath = join(cache.path, styleTileset, `${tms}.mbtiles`);
+
+    let exists = false;
+
+    try {
+      await fs.access(tilePath, fs.constants.F_OK);
+      exists = true;
+    } catch (err) {
+      // Handle error
+    }
+
+    if (!exists) {
+      return false;
+    }
+
+    const mbt = await getMbtiles(tilePath, false, forceXyz);
+
+    exists = await mbt.hasTile(z, x, y);
+
+    return exists;
+  };
+
   const path: Store["path"] = (type, relPath) => {
     let storePath = relPath;
 
@@ -190,6 +247,7 @@ export const createStoreFs = async (
     read,
     readJson,
     path,
+    hasTile,
     writeTile,
     close,
   };
