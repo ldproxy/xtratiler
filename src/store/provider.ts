@@ -87,7 +87,8 @@ const fanoutLevels = async (
   tms: string,
   type: string,
   storage: string,
-  levels: { min: number; max: number }
+  levels: { min: number; max: number },
+  hasRaster: boolean
 ): Promise<Cache[]> =>
   Promise.all(
     new Array(levels.max - levels.min + 1)
@@ -104,6 +105,7 @@ const fanoutLevels = async (
             type === "IMMUTABLE",
             storage === "MBTILES"
           ),
+          hasRaster,
         };
       })
   );
@@ -113,12 +115,13 @@ const fanoutTms = async (
   api: string,
   type: string,
   storage: string,
-  levels: { [tms: string]: { min: number; max: number } }
+  levels: { [tms: string]: { min: number; max: number } },
+  hasRaster: boolean
 ): Promise<Cache[]> =>
   (
     await Promise.all(
       Object.keys(levels).flatMap(async (tms) =>
-        fanoutLevels(storeDir, api, tms, type, storage, levels[tms])
+        fanoutLevels(storeDir, api, tms, type, storage, levels[tms], hasRaster)
       )
     )
   ).flat();
@@ -138,7 +141,8 @@ export const getCaches = async (
             api,
             cache.type,
             cache.storage,
-            cache.levels
+            cache.levels,
+            !!provider.rasterTilesets
           );
         })
     )

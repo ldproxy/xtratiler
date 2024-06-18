@@ -5,6 +5,7 @@ export type Cache = {
   level: number;
   storage: string;
   path: string;
+  hasRaster: boolean;
 };
 
 export const enum ResourceType {

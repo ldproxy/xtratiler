@@ -100,7 +100,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     const provider = await getProviderByPath(tp);
     const caches = await getCaches(agent.storePath, api, provider);
     for (const cache of caches) {
-      if (cache.storage !== "PER_JOB") {
+      if (cache.hasRaster && cache.storage !== "PER_JOB") {
         agent.logger.warn(
           `Cache storage is not PER_JOB, disabling agent concurrency (${tp}, ${cache.storage})`
         );
