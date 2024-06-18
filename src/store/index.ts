@@ -9,7 +9,7 @@ export const enum StoreType {
 export interface Store {
   type: StoreType;
   api: string;
-  read: (type: ResourceType, path: string) => Promise<Buffer>;
+  read: (type: ResourceType, path: string) => Promise<Buffer | undefined>;
   readJson: (type: ResourceType, path: string) => Promise<object>;
   path: (type: ResourceType, path: string) => string;
   hasTile: (

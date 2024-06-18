@@ -163,14 +163,15 @@ export const createStoreFs = async (
       await fs.access(tilePath, fs.constants.F_OK);
       exists = true;
     } catch (err) {
-      // Handle error
+      // ignore
     }
 
     if (!exists) {
       return false;
     }
 
-    const mbt = await getMbtiles(tilePath, false, forceXyz);
+    // since hasTile is only used by writeTile and mbtiles instances are cached, we need to set writable to true
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
 
     exists = await mbt.hasTile(z, x, y);
 

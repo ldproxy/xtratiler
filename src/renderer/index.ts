@@ -47,8 +47,19 @@ export type JobContext = JobParameters & {
 };
 
 export const render = async (parameters: JobParameters, logger: Logger) => {
-  const { id, stylePath, storePath, tileset, tmsId, minX, maxX, minY, maxY } =
-    parameters;
+  const {
+    id,
+    stylePath,
+    storePath,
+    tileset,
+    tmsId,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    agent,
+    storageHint,
+  } = parameters;
 
   const progress: Progress = {
     jobId: id,
@@ -72,7 +83,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
       storePath,
       stylePath.substring(0, stylePath.indexOf("/")),
       tileset,
-      parameters.agent ? parameters.storageHint : "detect",
+      agent ? storageHint : "detect",
       logger
     );
     store2 = store;
@@ -97,14 +108,18 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     const duration = process.hrtime(progress.started);
     logger.info(`Finished rendering job with id ${id} in ${pretty(duration)}`);
 
-    process.exitCode = 0;
+    if (!agent) {
+      process.exitCode = 0;
+    }
   } catch (e) {
     clearInterval(progressLogger);
 
     logger.error(progressMessage(progress, "Aborted"));
     logger.error(`Rendering job with id ${id} failed: ${e}`);
 
-    process.exitCode = 1;
+    if (!agent) {
+      process.exitCode = 1;
+    }
   } finally {
     if (store2) {
       await store2.close();
