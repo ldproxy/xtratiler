@@ -35,6 +35,12 @@ export const createAssetReader = (
         .then((arrayBuffer) => {
           assets.set(url, Buffer.from(arrayBuffer));
           callback(undefined, { data: Buffer.from(arrayBuffer) });
+        })
+        .catch((error) => {
+          logger.error(
+            `Error while making resource request to: ${url}\n${error}`
+          );
+          callback(error);
         });
       return;
     }
