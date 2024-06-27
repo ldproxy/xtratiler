@@ -22,6 +22,11 @@ export type TileMatrixSet = {
 
 const tileMatrixSets: { [key: string]: TileMatrixSet } = {
   WebMercatorQuad: { name: "WebMercatorQuad", tileSize: 256, zoomDelta: 0 },
+  WorldMercatorWGS84Quad: {
+    name: "WorldMercatorWGS84Quad",
+    tileSize: 256,
+    zoomDelta: 0,
+  },
   AdV_25832: { name: "AdV_25832", tileSize: 256, zoomDelta: -5 },
   AdV_25833: { name: "AdV_25833", tileSize: 256, zoomDelta: -5 },
 };
