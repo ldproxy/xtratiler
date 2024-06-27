@@ -32,6 +32,10 @@ export interface Store {
   close: () => Promise<void>;
 }
 
+const stores: Map<StoreType, Map<string, Store>> = new Map([
+  [StoreType.FS, new Map<string, Store>()],
+]);
+
 export const createStore = async (
   type: StoreType,
   storeLocation: string,
@@ -41,7 +45,25 @@ export const createStore = async (
   logger: Logger
 ): Promise<Store> => {
   if (type === StoreType.FS) {
-    return createStoreFs(storeLocation, api, tileset, storageHint, logger);
+    const key = storeLocation + api + tileset + (storageHint || "");
+
+    if (stores.get(StoreType.FS)?.has(key)) {
+      return stores.get(StoreType.FS)?.get(key) as Store;
+    }
+
+    logger.error(`Create FS store: ${key}`);
+
+    const store = await createStoreFs(
+      storeLocation,
+      api,
+      tileset,
+      storageHint,
+      logger
+    );
+
+    stores.get(StoreType.FS)?.set(key, store);
+
+    return store;
   }
 
   throw new Error(`Unsupported store type: ${type}`);
