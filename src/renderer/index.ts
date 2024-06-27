@@ -1,4 +1,5 @@
 import pretty from "pretty-time";
+import { Mutex } from "async-mutex";
 
 import { Logger } from "../util/index.js";
 import { Store, StoreType, createStore } from "../store/index.js";
@@ -10,6 +11,19 @@ import {
 } from "../style/index.js";
 import { ResourceType } from "../store/common.js";
 import { renderTiles } from "./tiles.js";
+
+const metaMutex = new Mutex();
+const mutexes: Map<string, Mutex> = new Map();
+
+const getMutex = async (identifier: string) =>
+  metaMutex.runExclusive(async () => {
+    let mutex = mutexes.get(identifier);
+    if (!mutex) {
+      mutex = new Mutex();
+      mutexes.set(identifier, mutex);
+    }
+    return mutex;
+  });
 
 export type JobParameters = {
   id: string;
@@ -42,6 +56,7 @@ export type JobContext = JobParameters & {
   store: Store;
   tms: TileMatrixSet;
   style: Style;
+  mutex: Mutex | undefined;
   logger: Logger;
   incProgress: () => void;
 };
@@ -59,6 +74,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     maxY,
     agent,
     storageHint,
+    concurrency,
   } = parameters;
 
   const progress: Progress = {
@@ -92,11 +108,15 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
 
     const style = await getStyle(store, stylePath, tmsId, logger);
 
+    const key = storePath + stylePath + tileset + tmsId;
+    const mutex = concurrency > 1 ? await getMutex(key) : undefined;
+
     const jobContext: JobContext = {
       ...parameters,
       store,
       tms,
       style,
+      mutex,
       logger,
       incProgress: () => progress.current++,
     };

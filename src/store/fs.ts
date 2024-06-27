@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import { join, dirname } from "path";
-import { Mutex } from "async-mutex";
 import { Logger } from "../util/index.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
@@ -14,7 +13,6 @@ export const createStoreFs = async (
   storageHint: string | undefined,
   logger: Logger
 ): Promise<Store> => {
-  const mutex = new Mutex();
   const providerId = `${api}-tiles`;
   const provider: any = await getProvider(storeDir, providerId, logger);
 
@@ -110,15 +108,8 @@ export const createStoreFs = async (
       recursive: true,
     });
 
-    if (jobSize > 0) {
-      const mbt = await getMbtiles(tilePath, true, forceXyz);
-      await mbt.putTile(z, x, y, png);
-    } else {
-      await mutex.runExclusive(async () => {
-        const mbt = await getMbtiles(tilePath, true, forceXyz);
-        await mbt.putTile(z, x, y, png);
-      });
-    }
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
+    await mbt.putTile(z, x, y, png);
 
     logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
   };
