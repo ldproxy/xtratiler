@@ -135,6 +135,7 @@ export const getCaches = async (
     await Promise.all(
       ((provider.caches as any[]) || [])
         .filter((cache) => cache.seeded !== false)
+        .slice(0, 1)
         .flatMap(async (cache) => {
           return await fanoutTms(
             storeDir,

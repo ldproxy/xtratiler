@@ -9,6 +9,9 @@ export const enum StoreType {
 export interface Store {
   type: StoreType;
   api: string;
+  perTile: boolean;
+  perJob: boolean;
+  perTileset: boolean;
   read: (type: ResourceType, path: string) => Promise<Buffer | undefined>;
   readJson: (type: ResourceType, path: string) => Promise<object>;
   path: (type: ResourceType, path: string) => string;

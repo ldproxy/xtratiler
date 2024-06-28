@@ -109,7 +109,8 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     const style = await getStyle(store, stylePath, tmsId, logger);
 
     const key = storePath + stylePath + tileset + tmsId;
-    const mutex = concurrency > 1 ? await getMutex(key) : undefined;
+    const mutex =
+      concurrency > 1 && !store.perTile ? await getMutex(key) : undefined;
 
     const jobContext: JobContext = {
       ...parameters,

@@ -6,6 +6,9 @@ import { getCaches, getProvider } from "./provider.js";
 import { MBTiles, openMbtiles } from "../util/mbtiles.js";
 import { Store, StoreType } from "./index.js";
 
+const isPerTile = (cache: Cache) =>
+  cache.storage === "PLAIN" || cache.storage === "PER_TILE";
+
 export const createStoreFs = async (
   storeDir: string,
   api: string,
@@ -27,6 +30,10 @@ export const createStoreFs = async (
     storageHint === "detect"
       ? caches.every((cache) => cache.storage === "PER_JOB")
       : !!storageHint;
+  const perTile = caches.every(isPerTile);
+  const perTileset = caches.every(
+    (cache) => cache.storage === "MBTILES" || cache.storage === "PER_TILESET"
+  );
   const jobSize = !perJob
     ? 0
     : jobSizeLetter === "S"
@@ -81,7 +88,7 @@ export const createStoreFs = async (
 
     const styleTileset = `${tileset}_${styleId}`;
 
-    if (cache.storage === "PLAIN") {
+    if (isPerTile(cache)) {
       const tilePath = join(
         cache.path,
         styleTileset,
@@ -130,7 +137,7 @@ export const createStoreFs = async (
 
     const styleTileset = `${tileset}_${styleId}`;
 
-    if (cache.storage === "PLAIN") {
+    if (isPerTile(cache)) {
       const tilePath = join(
         cache.path,
         styleTileset,
@@ -233,7 +240,7 @@ export const createStoreFs = async (
       throw new Error(`No cache found for tile "${relPath}".`);
     }
 
-    if (cache.storage === "PLAIN") {
+    if (isPerTile(cache)) {
       return fs.readFile(path(ResourceType.Tile, relPath));
     }
 
@@ -298,6 +305,9 @@ export const createStoreFs = async (
   return {
     type: StoreType.FS,
     api,
+    perTile,
+    perJob,
+    perTileset,
     read,
     readJson,
     path,
