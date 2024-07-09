@@ -23,5 +23,8 @@ export const createLogger = (verboseLevel: number): Logger =>
     pretty({
       levelFirst: true,
       ignore: "pid,hostname",
+      customPrettifiers: {
+        name: (value, key, log, { colors }) => colors.dim(`${value}`),
+      },
     })
   );

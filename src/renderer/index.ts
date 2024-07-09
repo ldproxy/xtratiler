@@ -2,7 +2,16 @@ import pretty from "pretty-time";
 import { Mutex } from "async-mutex";
 
 import { Logger } from "../util/index.js";
-import { Store, StoreType, createStore } from "../store/index.js";
+import {
+  Storage,
+  StorageDetect,
+  StorageExplicit,
+  StorageType,
+  Store,
+  StoreType,
+  createStore,
+  createStoreExplicit,
+} from "../store/index.js";
 import {
   getTileMatrixSet,
   TileMatrixSet,
@@ -27,8 +36,7 @@ const getMutex = async (identifier: string) =>
 
 export type JobParameters = {
   id: string;
-  stylePath: string;
-  storePath: string;
+  api: string;
   tileset: string;
   tmsId: string;
   z: number;
@@ -40,16 +48,8 @@ export type JobParameters = {
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   overwrite: boolean;
   mbtilesForceXyz: boolean;
-  storageHint: string | undefined;
+  storage: Storage;
   agent: boolean;
-};
-
-type Progress = {
-  jobId: string;
-  started: [number, number];
-  total: number;
-  current: number;
-  msg: string;
 };
 
 export type JobContext = JobParameters & {
@@ -61,21 +61,16 @@ export type JobContext = JobParameters & {
   incProgress: () => void;
 };
 
+type Progress = {
+  jobId: string;
+  started: [number, number];
+  total: number;
+  current: number;
+  msg: string;
+};
+
 export const render = async (parameters: JobParameters, logger: Logger) => {
-  const {
-    id,
-    stylePath,
-    storePath,
-    tileset,
-    tmsId,
-    minX,
-    maxX,
-    minY,
-    maxY,
-    agent,
-    storageHint,
-    concurrency,
-  } = parameters;
+  const { id, minX, maxX, minY, maxY, agent, storage } = parameters;
 
   const progress: Progress = {
     jobId: id,
@@ -94,33 +89,21 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
 
   let store2: Store | undefined;
   try {
-    const store = await createStore(
-      StoreType.FS,
-      storePath,
-      stylePath.substring(0, stylePath.indexOf("/")),
-      tileset,
-      agent ? storageHint : "detect",
-      logger
-    );
-    store2 = store;
-
-    const tms = getTileMatrixSet(tmsId);
-
-    const style = await getStyle(store, stylePath, tmsId, logger);
-
-    const key = storePath + stylePath + tileset + tmsId;
-    const mutex =
-      concurrency > 1 && !store.perTile ? await getMutex(key) : undefined;
-
-    const jobContext: JobContext = {
-      ...parameters,
-      store,
-      tms,
-      style,
-      mutex,
-      logger,
-      incProgress: () => progress.current++,
-    };
+    const jobContext =
+      storage.type === StorageType.DETECT
+        ? await createContextDetect(
+            parameters,
+            logger,
+            progress,
+            storage as StorageDetect
+          )
+        : await createContextExplicit(
+            parameters,
+            logger,
+            progress,
+            storage as StorageExplicit
+          );
+    store2 = jobContext.store;
 
     await renderTiles(jobContext);
 
@@ -146,6 +129,65 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
       await store2.close();
     }
   }
+};
+
+const createContextDetect = async (
+  parameters: JobParameters,
+  logger: Logger,
+  progress: Progress,
+  storage: StorageDetect
+): Promise<JobContext> => {
+  const { api, tileset, tmsId } = parameters;
+
+  const store = await createStore(
+    StoreType.FS,
+    storage.store,
+    api,
+    tileset,
+    "detect",
+    logger
+  );
+
+  const tms = getTileMatrixSet(tmsId);
+  const style = await getStyle(store, storage.styleRel, tmsId, logger);
+  const mutex = undefined;
+
+  return {
+    ...parameters,
+    store,
+    tms,
+    style,
+    mutex,
+    logger,
+    incProgress: () => progress.current++,
+  };
+};
+
+const createContextExplicit = async (
+  parameters: JobParameters,
+  logger: Logger,
+  progress: Progress,
+  storage: StorageExplicit
+): Promise<JobContext> => {
+  const { api, tileset, tmsId, concurrency } = parameters;
+
+  const store = await createStoreExplicit(StoreType.FS, api, storage, logger);
+
+  const tms = getTileMatrixSet(tmsId);
+  const style = await getStyle(store, storage.style, tmsId, logger);
+  const key = storage.style + tileset + tmsId;
+  const mutex =
+    concurrency > 1 && !store.perTile ? await getMutex(key) : undefined;
+
+  return {
+    ...parameters,
+    store,
+    tms,
+    style,
+    mutex,
+    logger,
+    incProgress: () => progress.current++,
+  };
 };
 
 const percentDone = (progress: Progress) =>

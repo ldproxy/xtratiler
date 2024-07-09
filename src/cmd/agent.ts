@@ -10,6 +10,7 @@ import {
   getCaches,
   getProviderByPath,
 } from "../store/provider.js";
+import { StorageExplicit, StorageType } from "../store/index.js";
 
 export type AgentArgs = GlobalArgs & {
   queueUrl: string;
@@ -179,15 +180,19 @@ const processJob = async (agent: Agent, job: any) => {
     0,
     job.details.tileSet.lastIndexOf("_")
   );
-  const styleId = job.details.tileSet.substring(
-    job.details.tileSet.lastIndexOf("_") + 1
-  );
-  const perJob = job.details.storageHint !== job.details.tileSet;
+
+  const storage: StorageExplicit = {
+    type: StorageType.EXPLICIT,
+    tileStorage: job.details.storage.type,
+    jobSize: parseInt(job.details.storage.jobSize),
+    vector: job.details.storage.vector,
+    raster: job.details.storage.raster,
+    style: job.details.storage.style,
+  };
 
   const job2: JobParameters = {
     id: job.id,
-    stylePath: `${apiId}/${styleId}.mbs`,
-    storePath: agent.storePath,
+    api: apiId,
     tileset: tileset,
     tmsId: job.details.tileMatrixSet,
     z: job.details.subMatrices[0].level,
@@ -199,14 +204,14 @@ const processJob = async (agent: Agent, job: any) => {
     concurrency: agent.concurrencyEnabled ? 1 : agent.concurrency,
     overwrite: job.details.reseed,
     mbtilesForceXyz: false,
-    storageHint: agent.concurrencyEnabled ? job.details.storageHint : undefined,
+    storage,
     agent: true,
   };
 
   agent.logger.debug("Submitting rendering job: %o", job2);
 
   try {
-    await render(job2, agent.logger);
+    await render(job2, agent.logger.child({ name: job2.id }));
   } catch (error) {
     agent.logger.error(`Error rendering job with id ${job2.id}: ${error}`);
   }

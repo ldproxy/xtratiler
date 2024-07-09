@@ -58,6 +58,10 @@ export const getStyle = async (
 
   const styleRaw = await store.read(ResourceType.Style, stylePath);
 
+  if (!styleRaw) {
+    throw new Error(`Style not found: ${stylePath}`);
+  }
+
   const style = adjustStyle(parseStyle(styleRaw), tms);
 
   //await fs.writeFile(`out/output_style.json`, JSON.stringify(style, null, 2));

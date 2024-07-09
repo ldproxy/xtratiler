@@ -54,7 +54,7 @@
     "js-yaml": "^4.1.0",
     "modern-async": "^2.0.0",
     "pino": "^8.20.0",
-    "pino-pretty": "^11.0.0",
+    "pino-pretty": "^11.2.1",
     "pretty-time": "^1.1.0",
     "promisify-child-process": "^4.1.2",
     "sharp": "^0.33.3",

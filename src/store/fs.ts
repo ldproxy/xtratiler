@@ -4,18 +4,20 @@ import { Logger } from "../util/index.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
 import { MBTiles, openMbtiles } from "../util/mbtiles.js";
-import { Store, StoreType } from "./index.js";
+import { StorageExplicit, Store, StoreType } from "./index.js";
 
 const isPerTile = (cache: Cache) =>
   cache.storage === "PLAIN" || cache.storage === "PER_TILE";
 
-export const createStoreFs = async (
+const isPerTile2 = (storage: StorageExplicit) =>
+  storage.tileStorage === "PLAIN" || storage.tileStorage === "PER_TILE";
+
+const getSeedingDetect = async (
   storeDir: string,
   api: string,
-  tileset: string,
   storageHint: string | undefined,
   logger: Logger
-): Promise<Store> => {
+) => {
   const providerId = `${api}-tiles`;
   const provider: any = await getProvider(storeDir, providerId, logger);
 
@@ -71,54 +73,101 @@ export const createStoreFs = async (
 
   //logger.debug(`Provider: ${JSON.stringify(cachePaths, null, 2)}`);
 
-  const writeTile = async (
-    styleId: string,
-    tms: string,
-    z: number,
-    x: number,
-    y: number,
-    png: Buffer,
-    forceXyz: boolean
-  ): Promise<void> => {
-    const cache = findCache4(tms, Math.max(z - 1, 0));
+  return {
+    perTile,
+    perJob,
+    perTileset,
+    jobSize,
+    findCache,
+    findCache2,
+    findCache3,
+    findCache4,
+  };
+};
 
-    if (!cache) {
-      throw new Error(`No cache found for tms "${tms}" and level "${z}".`);
+export const createStoreFs = async (
+  storeDir: string,
+  api: string,
+  tileset: string,
+  storageHint: string | undefined,
+  logger: Logger
+): Promise<Store> => {
+  const seeding = await getSeedingDetect(storeDir, api, storageHint, logger);
+
+  const path: Store["path"] = (type, relPath) => {
+    let storePath = relPath;
+
+    if (type === ResourceType.Tile) {
+      const cache = seeding.findCache(relPath);
+
+      storePath = cache ? join(cache, tileset, relPath) : "";
+
+      return storePath;
     }
 
-    const styleTileset = `${tileset}_${styleId}`;
+    return join(storeDir, resourceTypeToDir[type], storePath);
+  };
+
+  const read: Store["read"] = async (type, relPath) => {
+    if (type === ResourceType.Tile) {
+      return readTile(relPath);
+    }
+
+    return fs.readFile(path(type, relPath));
+  };
+
+  const singleRowCol = seeding.jobSize > 0 ? Math.sqrt(seeding.jobSize) : 0;
+  const singlePartitionLevel =
+    seeding.jobSize > 0 ? Math.log(singleRowCol) / Math.log(2) : 0;
+
+  const getPartition = (z: number, x: number, y: number): string => {
+    if (z <= singlePartitionLevel) {
+      return `${z}`;
+    }
+
+    const rowPartition = Math.floor(y / singleRowCol);
+    const colPartition = Math.floor(x / singleRowCol);
+    const rowMin = rowPartition * singleRowCol;
+    const rowMax = (rowPartition + 1) * singleRowCol - 1;
+    const colMin = colPartition * singleRowCol;
+    const colMax = (colPartition + 1) * singleRowCol - 1;
+
+    return `${z}_${rowMin}-${rowMax}_${colMin}-${colMax}`;
+  };
+
+  const readTile = async (relPath: string) => {
+    const cache = seeding.findCache3(relPath);
+
+    if (cache === undefined) {
+      throw new Error(`No cache found for tile "${relPath}".`);
+    }
 
     if (isPerTile(cache)) {
-      const tilePath = join(
-        cache.path,
-        styleTileset,
-        `${tms}/${z}/${y}/${x}.png`
-      );
-
-      await fs.mkdir(dirname(tilePath), {
-        recursive: true,
-      });
-      await fs.writeFile(tilePath, png);
-
-      logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
-      return;
+      return fs.readFile(path(ResourceType.Tile, relPath));
     }
 
+    const tile = relPath.split("/");
+    const zyx = tile.slice(1).map((d) => parseInt(d));
     const mbtilesName =
-      jobSize > 0
-        ? `${tms}/${getPartition(z, x, y)}.mbtiles`
-        : `${tms}.mbtiles`;
+      seeding.jobSize > 0
+        ? `${tile[0]}/${getPartition(zyx[0], zyx[2], zyx[1])}.mbtiles`
+        : `${tile[0]}.mbtiles`;
 
-    const tilePath = join(cache.path, styleTileset, mbtilesName);
+    const tilePath = join(cache.path, tileset, mbtilesName);
 
-    await fs.mkdir(dirname(tilePath), {
-      recursive: true,
-    });
+    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+    try {
+      const mbt = await getMbtiles(tilePath);
 
-    const mbt = await getMbtiles(tilePath, true, forceXyz);
-    await mbt.putTile(z, x, y, png);
+      //TODO
+      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
+    } catch (err) {
+      if (seeding.perJob) {
+        return undefined;
+      }
 
-    logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+      throw err;
+    }
   };
 
   const hasTile = async (
@@ -129,7 +178,7 @@ export const createStoreFs = async (
     y: number,
     forceXyz: boolean
   ): Promise<boolean> => {
-    const cache = findCache4(tms, Math.max(z - 1, 0));
+    const cache = seeding.findCache4(tms, Math.max(z - 1, 0));
 
     if (!cache) {
       throw new Error(`No cache found for tms "${tms}" and level "${z}".`);
@@ -157,7 +206,7 @@ export const createStoreFs = async (
     }
 
     const mbtilesName =
-      jobSize > 0
+      seeding.jobSize > 0
         ? `${tms}/${getPartition(z, x, y)}.mbtiles`
         : `${tms}.mbtiles`;
 
@@ -184,88 +233,54 @@ export const createStoreFs = async (
     return exists;
   };
 
-  const path: Store["path"] = (type, relPath) => {
-    let storePath = relPath;
+  const writeTile = async (
+    styleId: string,
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    png: Buffer,
+    forceXyz: boolean
+  ): Promise<void> => {
+    const cache = seeding.findCache4(tms, Math.max(z - 1, 0));
 
-    if (type === ResourceType.Tile) {
-      const cache = findCache(relPath);
-
-      storePath = cache ? join(cache, tileset, relPath) : "";
-
-      return storePath;
+    if (!cache) {
+      throw new Error(`No cache found for tms "${tms}" and level "${z}".`);
     }
 
-    return join(storeDir, resourceTypeToDir[type], storePath);
-  };
-
-  const read: Store["read"] = async (type, relPath) => {
-    if (type === ResourceType.Tile) {
-      return readTile(relPath);
-    }
-
-    return fs.readFile(path(type, relPath));
-  };
-
-  const readJson: Store["readJson"] = async (type, relPath) => {
-    return fs
-      .readFile(path(type, relPath), { encoding: "utf-8" })
-      .then((data) => {
-        return JSON.parse(data);
-      });
-  };
-
-  const singleRowCol = jobSize > 0 ? Math.sqrt(jobSize) : 0;
-  const singlePartitionLevel =
-    jobSize > 0 ? Math.log(singleRowCol) / Math.log(2) : 0;
-
-  const getPartition = (z: number, x: number, y: number): string => {
-    if (z <= singlePartitionLevel) {
-      return `${z}`;
-    }
-
-    const rowPartition = Math.floor(y / singleRowCol);
-    const colPartition = Math.floor(x / singleRowCol);
-    const rowMin = rowPartition * singleRowCol;
-    const rowMax = (rowPartition + 1) * singleRowCol - 1;
-    const colMin = colPartition * singleRowCol;
-    const colMax = (colPartition + 1) * singleRowCol - 1;
-
-    return `${z}_${rowMin}-${rowMax}_${colMin}-${colMax}`;
-  };
-
-  const readTile = async (relPath: string) => {
-    const cache = findCache3(relPath);
-
-    if (cache === undefined) {
-      throw new Error(`No cache found for tile "${relPath}".`);
-    }
+    const styleTileset = `${tileset}_${styleId}`;
 
     if (isPerTile(cache)) {
-      return fs.readFile(path(ResourceType.Tile, relPath));
+      const tilePath = join(
+        cache.path,
+        styleTileset,
+        `${tms}/${z}/${y}/${x}.png`
+      );
+
+      await fs.mkdir(dirname(tilePath), {
+        recursive: true,
+      });
+      await fs.writeFile(tilePath, png);
+
+      logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+      return;
     }
 
-    const tile = relPath.split("/");
-    const zyx = tile.slice(1).map((d) => parseInt(d));
     const mbtilesName =
-      jobSize > 0
-        ? `${tile[0]}/${getPartition(zyx[0], zyx[2], zyx[1])}.mbtiles`
-        : `${tile[0]}.mbtiles`;
+      seeding.jobSize > 0
+        ? `${tms}/${getPartition(z, x, y)}.mbtiles`
+        : `${tms}.mbtiles`;
 
-    const tilePath = join(cache.path, tileset, mbtilesName);
+    const tilePath = join(cache.path, styleTileset, mbtilesName);
 
-    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
-    try {
-      const mbt = await getMbtiles(tilePath);
+    await fs.mkdir(dirname(tilePath), {
+      recursive: true,
+    });
 
-      //TODO
-      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
-    } catch (err) {
-      if (perJob) {
-        return undefined;
-      }
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
+    await mbt.putTile(z, x, y, png);
 
-      throw err;
-    }
+    logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
   };
 
   const mbtiles = new Map<string, MBTiles>();
@@ -305,11 +320,203 @@ export const createStoreFs = async (
   return {
     type: StoreType.FS,
     api,
-    perTile,
-    perJob,
-    perTileset,
+    perTile: seeding.perTile,
+    perJob: seeding.perJob,
+    perTileset: seeding.perTileset,
     read,
-    readJson,
+    path,
+    hasTile,
+    writeTile,
+    close,
+  };
+};
+
+export const createStoreFsExplicit = async (
+  api: string,
+  storage: StorageExplicit,
+  logger: Logger
+): Promise<Store> => {
+  const path: Store["path"] = (type, relPath) => {
+    if (type === ResourceType.Tile) {
+      return storage.vector;
+    }
+    if (type === ResourceType.Style) {
+      return storage.style;
+    }
+
+    //TODO
+    const storeDir = storage.vector.substring(
+      0,
+      storage.vector.lastIndexOf("/resources")
+    );
+
+    return join(storeDir, resourceTypeToDir[type], relPath);
+  };
+
+  const read: Store["read"] = async (type, relPath) => {
+    if (type === ResourceType.Tile) {
+      return readTile(relPath);
+    }
+    if (type === ResourceType.Style) {
+      return fs.readFile(storage.style);
+    }
+
+    return fs.readFile(path(type, relPath));
+  };
+
+  const readTile = async (relPath: string) => {
+    const tile = relPath.split("/");
+    const zyx = tile.slice(1).map((d) => parseInt(d));
+    const tilePath = storage.vector;
+
+    //TODO
+    if (isPerTile2(storage)) {
+      return fs.readFile(
+        tilePath.replace("{row}", `${zyx[1]}`).replace("{col}", `${zyx[2]}`)
+      );
+    }
+
+    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+
+    try {
+      const mbt = await getMbtiles(tilePath);
+
+      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
+    } catch (err) {
+      //TODO
+      if (storage.tileStorage === "PER_JOB") {
+        logger.warn(`Tile not found: ${relPath}`, err);
+        return undefined;
+      }
+
+      throw err;
+    }
+  };
+
+  const hasTile = async (
+    styleId: string,
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    forceXyz: boolean
+  ): Promise<boolean> => {
+    if (isPerTile2(storage)) {
+      const tilePath = storage.raster
+        .replace("{row}", `${y}`)
+        .replace("{col}", `${x}`);
+
+      let exists = false;
+
+      try {
+        await fs.access(tilePath, fs.constants.F_OK);
+        exists = true;
+      } catch (err) {
+        // Handle error
+      }
+
+      return exists;
+    }
+
+    const tilePath = storage.raster;
+
+    let exists = false;
+
+    try {
+      await fs.access(tilePath, fs.constants.F_OK);
+      exists = true;
+    } catch (err) {
+      // ignore
+    }
+
+    if (!exists) {
+      return false;
+    }
+
+    // since hasTile is only used by writeTile and mbtiles instances are cached, we need to set writable to true
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
+
+    exists = await mbt.hasTile(z, x, y);
+
+    return exists;
+  };
+
+  const writeTile = async (
+    styleId: string,
+    tms: string,
+    z: number,
+    x: number,
+    y: number,
+    png: Buffer,
+    forceXyz: boolean
+  ): Promise<void> => {
+    if (isPerTile2(storage)) {
+      const tilePath = storage.raster
+        .replace("{row}", `${y}`)
+        .replace("{col}", `${x}`);
+
+      await fs.mkdir(dirname(tilePath), {
+        recursive: true,
+      });
+      await fs.writeFile(tilePath, png);
+
+      logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+      return;
+    }
+
+    const tilePath = storage.raster;
+
+    await fs.mkdir(dirname(tilePath), {
+      recursive: true,
+    });
+
+    const mbt = await getMbtiles(tilePath, true, forceXyz);
+    await mbt.putTile(z, x, y, png);
+
+    logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+  };
+
+  const mbtiles = new Map<string, MBTiles>();
+
+  const getMbtiles = async (
+    path: string,
+    writable?: boolean,
+    forceXyz?: boolean
+  ): Promise<MBTiles> => {
+    if (mbtiles.has(path)) {
+      return mbtiles.get(path) as MBTiles;
+    }
+
+    const mbt = await openMbtiles(path, writable, forceXyz);
+    mbtiles.set(path, mbt);
+
+    if (writable) {
+      await mbt.putInfo({
+        name: path.substring(path.lastIndexOf("/") + 1),
+        format: "png",
+      });
+    }
+
+    const info = await mbt.getInfo();
+    //console.log("INFO", info);
+
+    return mbt;
+  };
+
+  const close = async () => {
+    await Promise.all(
+      Array.from(mbtiles.values()).map(async (mbt) => await mbt.close())
+    );
+    mbtiles.clear();
+  };
+
+  return {
+    type: StoreType.FS,
+    api,
+    perTile: storage.tileStorage === "PER_TILE",
+    perJob: storage.tileStorage === "PER_JOB",
+    perTileset: storage.tileStorage === "PER_TILESET",
+    read,
     path,
     hasTile,
     writeTile,

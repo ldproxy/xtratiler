@@ -4,6 +4,7 @@ import confirm from "@inquirer/confirm";
 import { JobParameters, render } from "../renderer/index.js";
 import { createLogger } from "../util/index.js";
 import { GlobalArgs } from "../index.js";
+import { StorageDetect, StorageType } from "../store/index.js";
 
 export type RenderArgs = GlobalArgs & {
   style: string;
@@ -135,10 +136,17 @@ export const builder = (yargs: Argv<{}>) => {
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<RenderArgs>;
 
+  const apiId = argv2.style.substring(0, argv2.style.indexOf("/"));
+
+  const storage: StorageDetect = {
+    type: StorageType.DETECT,
+    store: argv2.store,
+    styleRel: argv2.style,
+  };
+
   const job: JobParameters = {
     id: "1",
-    stylePath: argv2.style,
-    storePath: argv2.store,
+    api: apiId,
     tileset: "__all__",
     tmsId: argv2.tms,
     z: argv2.zoom,
@@ -150,7 +158,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     concurrency: argv2.concurrency,
     overwrite: argv2.overwrite,
     mbtilesForceXyz: argv2.mbtilesForceXyz,
-    storageHint: undefined,
+    storage,
     agent: false,
   };
 
