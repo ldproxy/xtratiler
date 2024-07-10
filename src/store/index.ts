@@ -23,6 +23,7 @@ export type StorageDetect = Storage & {
 
 export type StorageExplicit = Storage & {
   type: StorageType.EXPLICIT;
+  store: string;
   tileStorage: string;
   jobSize: number;
   vector: string;
@@ -81,12 +82,13 @@ export const createStore = async (
 
 export const createStoreExplicit = async (
   type: StoreType,
+  storeLocation: string,
   api: string,
   storage: StorageExplicit,
   logger: Logger
 ): Promise<Store> => {
   if (type === StoreType.FS) {
-    return await createStoreFsExplicit(api, storage, logger);
+    return await createStoreFsExplicit(storeLocation, api, storage, logger);
   }
 
   throw new Error(`Unsupported store type: ${type}`);

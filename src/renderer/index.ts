@@ -182,7 +182,13 @@ const createContextExplicit = async (
 ): Promise<JobContext> => {
   const { api, tileset, tmsId, concurrency } = parameters;
 
-  const store = await createStoreExplicit(StoreType.FS, api, storage, logger);
+  const store = await createStoreExplicit(
+    StoreType.FS,
+    storage.store,
+    api,
+    storage,
+    logger
+  );
 
   const tms = getTileMatrixSet(tmsId);
   const style = await getStyle(store, storage.style, tmsId, logger);

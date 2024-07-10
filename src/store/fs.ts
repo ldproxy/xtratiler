@@ -332,23 +332,18 @@ export const createStoreFs = async (
 };
 
 export const createStoreFsExplicit = async (
+  storeDir: string,
   api: string,
   storage: StorageExplicit,
   logger: Logger
 ): Promise<Store> => {
   const path: Store["path"] = (type, relPath) => {
     if (type === ResourceType.Tile) {
-      return storage.vector;
+      return join(storeDir, storage.vector);
     }
     if (type === ResourceType.Style) {
-      return storage.style;
+      return join(storeDir, storage.style);
     }
-
-    //TODO
-    const storeDir = storage.vector.substring(
-      0,
-      storage.vector.lastIndexOf("/resources")
-    );
 
     return join(storeDir, resourceTypeToDir[type], relPath);
   };
@@ -356,9 +351,6 @@ export const createStoreFsExplicit = async (
   const read: Store["read"] = async (type, relPath) => {
     if (type === ResourceType.Tile) {
       return readTile(relPath);
-    }
-    if (type === ResourceType.Style) {
-      return fs.readFile(storage.style);
     }
 
     return fs.readFile(path(type, relPath));
@@ -386,7 +378,7 @@ export const createStoreFsExplicit = async (
   const readTile = async (relPath: string) => {
     const tile = relPath.split("/");
     const zyx = tile.slice(1).map((d) => parseInt(d));
-    let tilePath = storage.vector;
+    let tilePath = join(storeDir, storage.vector);
 
     //TODO
     if (isPerTile2(storage)) {
@@ -416,7 +408,7 @@ export const createStoreFsExplicit = async (
     forceXyz: boolean
   ): Promise<boolean> => {
     if (isPerTile2(storage)) {
-      const tilePath = storage.raster
+      const tilePath = join(storeDir, storage.raster)
         .replace("{row}", `${y}`)
         .replace("{col}", `${x}`);
 
@@ -432,7 +424,7 @@ export const createStoreFsExplicit = async (
       return exists;
     }
 
-    const tilePath = storage.raster;
+    const tilePath = join(storeDir, storage.raster);
 
     let exists = false;
 
@@ -465,7 +457,7 @@ export const createStoreFsExplicit = async (
     forceXyz: boolean
   ): Promise<void> => {
     if (isPerTile2(storage)) {
-      const tilePath = storage.raster
+      const tilePath = join(storeDir, storage.raster)
         .replace("{row}", `${y}`)
         .replace("{col}", `${x}`);
 
@@ -478,7 +470,7 @@ export const createStoreFsExplicit = async (
       return;
     }
 
-    const tilePath = storage.raster;
+    const tilePath = join(storeDir, storage.raster);
 
     await fs.mkdir(dirname(tilePath), {
       recursive: true,

@@ -183,6 +183,7 @@ const processJob = async (agent: Agent, job: any) => {
 
   const storage: StorageExplicit = {
     type: StorageType.EXPLICIT,
+    store: agent.storePath,
     tileStorage: job.details.storage.type,
     jobSize: parseInt(job.details.storage.jobSize),
     vector: job.details.storage.vector,
