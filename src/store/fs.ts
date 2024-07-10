@@ -364,16 +364,40 @@ export const createStoreFsExplicit = async (
     return fs.readFile(path(type, relPath));
   };
 
+  const singleRowCol = storage.jobSize > 0 ? Math.sqrt(storage.jobSize) : 0;
+  const singlePartitionLevel =
+    storage.jobSize > 0 ? Math.log(singleRowCol) / Math.log(2) : 0;
+
+  const getPartition = (z: number, x: number, y: number): string => {
+    if (z <= singlePartitionLevel) {
+      return `${z}`;
+    }
+
+    const rowPartition = Math.floor(y / singleRowCol);
+    const colPartition = Math.floor(x / singleRowCol);
+    const rowMin = rowPartition * singleRowCol;
+    const rowMax = (rowPartition + 1) * singleRowCol - 1;
+    const colMin = colPartition * singleRowCol;
+    const colMax = (colPartition + 1) * singleRowCol - 1;
+
+    return `${z}_${rowMin}-${rowMax}_${colMin}-${colMax}`;
+  };
+
   const readTile = async (relPath: string) => {
     const tile = relPath.split("/");
     const zyx = tile.slice(1).map((d) => parseInt(d));
-    const tilePath = storage.vector;
+    let tilePath = storage.vector;
 
     //TODO
     if (isPerTile2(storage)) {
       return fs.readFile(
         tilePath.replace("{row}", `${zyx[1]}`).replace("{col}", `${zyx[2]}`)
       );
+    }
+
+    if (tilePath.includes("{partition}")) {
+      const partition = getPartition(zyx[0], zyx[2], zyx[1]);
+      tilePath = tilePath.replace("{partition}", partition);
     }
 
     logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
