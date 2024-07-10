@@ -206,20 +206,32 @@ const processJob = async (agent: Agent, job: any) => {
     mbtilesForceXyz: false,
     storage,
     agent: true,
+    updateProgress: (progress) => {
+      fetch(`${agent.queueUrl}/${job.id}`, {
+        method: "POST",
+        body: JSON.stringify({ current: progress.current }),
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+    },
   };
 
   agent.logger.debug("Submitting rendering job: %o", job2);
 
+  let error;
   try {
     await render(job2, agent.logger.child({ name: job2.id }));
-  } catch (error) {
-    agent.logger.error(`Error rendering job with id ${job2.id}: ${error}`);
+  } catch (err) {
+    agent.logger.error(`Error rendering job with id ${job2.id}: ${err}`);
+    error = err;
   }
 
   try {
-    const response = await fetch(agent.queueUrl, {
+    const response = await fetch(`${agent.queueUrl}/${job.id}`, {
       method: "DELETE",
-      body: JSON.stringify({ id: job.id }),
+      body: JSON.stringify({ error, retry: true }),
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",

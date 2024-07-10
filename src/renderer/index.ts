@@ -50,6 +50,7 @@ export type JobParameters = {
   mbtilesForceXyz: boolean;
   storage: Storage;
   agent: boolean;
+  updateProgress: (progress: Progress) => void;
 };
 
 export type JobContext = JobParameters & {
@@ -86,6 +87,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     () => logger.info(progressMessage(progress, "Running")),
     1000
   );
+  let progressUpdater;
 
   let store2: Store | undefined;
   try {
@@ -105,9 +107,15 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
           );
     store2 = jobContext.store;
 
+    progressUpdater = setInterval(
+      () => jobContext.updateProgress(progress),
+      5000
+    );
+
     await renderTiles(jobContext);
 
     clearInterval(progressLogger);
+    clearInterval(progressUpdater);
 
     const duration = process.hrtime(progress.started);
     logger.info(`Finished rendering job with id ${id} in ${pretty(duration)}`);
@@ -117,12 +125,15 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     }
   } catch (e) {
     clearInterval(progressLogger);
+    clearInterval(progressUpdater);
 
     logger.error(progressMessage(progress, "Aborted"));
     logger.error(`Rendering job with id ${id} failed: ${e}`);
 
     if (!agent) {
       process.exitCode = 1;
+    } else {
+      throw e;
     }
   } finally {
     if (store2) {
