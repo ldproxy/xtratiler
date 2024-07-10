@@ -402,19 +402,9 @@ export const createStoreFsExplicit = async (
 
     logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
 
-    try {
-      const mbt = await getMbtiles(tilePath);
+    const mbt = await getMbtiles(tilePath);
 
-      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
-    } catch (err) {
-      //TODO
-      if (storage.tileStorage === "PER_JOB") {
-        logger.warn(`Tile not found: ${relPath}`, err);
-        return undefined;
-      }
-
-      throw err;
-    }
+    return mbt.getTile(zyx[0], zyx[2], zyx[1]);
   };
 
   const hasTile = async (
