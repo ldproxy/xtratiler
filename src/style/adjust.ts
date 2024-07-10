@@ -42,18 +42,18 @@ function adjustSource(
   source: VectorSourceSpecification,
   tms: TileMatrixSet
 ): VectorSourceSpecification {
-  if (tms.name === "WebMercatorQuad") {
-    return source;
-  }
-
   return {
     ...source,
     tiles: source.tiles
       ? source.tiles.map((url) => url.replace("WebMercatorQuad", tms.name))
+      : source.url
+      ? [
+          source.url
+            .replace("?f=tilejson", "/{z}/{y}/{x}?f=mvt")
+            .replace("WebMercatorQuad", tms.name),
+        ]
       : undefined,
-    url: source.url
-      ? source.url.replace("WebMercatorQuad", tms.name)
-      : undefined,
+    url: undefined,
     minzoom: source.minzoom
       ? Math.max(source.minzoom + tms.zoomDelta, 0)
       : undefined,
