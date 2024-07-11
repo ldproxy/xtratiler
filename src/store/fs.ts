@@ -155,7 +155,7 @@ export const createStoreFs = async (
 
     const tilePath = join(cache.path, tileset, mbtilesName);
 
-    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[1]}/${zyx[2]}`);
     try {
       const mbt = await getMbtiles(tilePath);
 
@@ -262,7 +262,7 @@ export const createStoreFs = async (
       });
       await fs.writeFile(tilePath, png);
 
-      logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+      logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
       return;
     }
 
@@ -280,7 +280,7 @@ export const createStoreFs = async (
     const mbt = await getMbtiles(tilePath, true, forceXyz);
     await mbt.putTile(z, x, y, png);
 
-    logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+    logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
   };
 
   const mbtiles = new Map<string, MBTiles>();
@@ -392,7 +392,7 @@ export const createStoreFsExplicit = async (
       tilePath = tilePath.replace("{partition}", partition);
     }
 
-    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[2]}/${zyx[1]}`);
+    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[1]}/${zyx[2]}`);
 
     try {
       const mbt = await getMbtiles(tilePath);
@@ -476,7 +476,7 @@ export const createStoreFsExplicit = async (
       });
       await fs.writeFile(tilePath, png);
 
-      logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+      logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
       return;
     }
 
@@ -489,7 +489,7 @@ export const createStoreFsExplicit = async (
     const mbt = await getMbtiles(tilePath, true, forceXyz);
     await mbt.putTile(z, x, y, png);
 
-    logger.debug(`Stored tile ${z}/${x}/${y} at: ${tilePath}`);
+    logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
   };
 
   const mbtiles = new Map<string, MBTiles>();

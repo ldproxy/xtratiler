@@ -170,7 +170,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     return;
   }
 
-  await render(job, createLogger(argv2.verbose));
+  await render(job, await createLogger(argv2.verbose));
 };
 
 const confirmRender = async (job: JobParameters) => {

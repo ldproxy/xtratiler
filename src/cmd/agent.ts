@@ -17,6 +17,7 @@ export type AgentArgs = GlobalArgs & {
   store: string;
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
+  fileLog: boolean;
 };
 
 export const command = "agent";
@@ -67,6 +68,13 @@ export const builder = (yargs: Argv<{}>) => {
       default: 1,
       choices: [1, 2, 4, 8, 16, 32],
       group: "Agent options:",
+    })
+    .option("file-log", {
+      alias: "f",
+      type: "boolean",
+      default: false,
+      description: "log to file instead of stdout",
+      group: "Agent options:",
     });
   /*.example([
       ['$0 --config "~/config.json"', "Use custom config"],
@@ -80,6 +88,7 @@ type Agent = {
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   concurrencyEnabled: boolean;
+  connected: boolean;
   logger: Logger;
 };
 
@@ -92,7 +101,8 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     ratio: argv2.ratio,
     concurrency: argv2.concurrency,
     concurrencyEnabled: true,
-    logger: createLogger(argv2.verbose),
+    connected: false,
+    logger: await createLogger(argv2.verbose, argv2.fileLog, argv2.store),
   };
 
   const tps = await findEntityPaths(agent.storePath);
@@ -113,8 +123,14 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   }
 
   readFromQueue(agent)
-    .then(() => agent.logger.info("Disconnected from job queue"))
-    .catch((err) => agent.logger.error(err));
+    .then(() => {
+      agent.logger.info("Disconnected from job queue: %s", agent.queueUrl);
+      process.exit(0);
+    })
+    .catch((err) => {
+      agent.logger.error(err);
+      process.exit(1);
+    });
 };
 
 async function readFromQueue(agent: Agent) {
@@ -157,15 +173,26 @@ const pollQueue = async (agent: Agent): Promise<any> => {
     });
 
     if (response.status === 200) {
+      if (!agent.connected) {
+        agent.logger.info("Connected to job queue: %s", agent.queueUrl);
+        agent.connected = true;
+      }
       return await response.json();
     }
 
     if (response.status !== 204) {
+      agent.connected = false;
       agent.logger.warn(
         `Polling job queue failed: ${response.status} ${response.statusText}`
       );
+    } else {
+      if (!agent.connected) {
+        agent.logger.info("Connected to job queue: %s", agent.queueUrl);
+        agent.connected = true;
+      }
     }
   } catch (error) {
+    agent.connected = false;
     agent.logger.error(`Polling job queue failed: ${error}`);
   }
 
@@ -208,6 +235,7 @@ const processJob = async (agent: Agent, job: any) => {
     storage,
     agent: true,
     updateProgress: (progress) => {
+      agent.logger.debug("Updating job progress: %s", job.id);
       fetch(`${agent.queueUrl}/${job.id}`, {
         method: "POST",
         body: JSON.stringify({ current: progress.current }),
@@ -215,6 +243,8 @@ const processJob = async (agent: Agent, job: any) => {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
+      }).then(() => {
+        agent.logger.debug("Updated job progress: %s", job.id);
       });
     },
   };

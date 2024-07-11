@@ -69,7 +69,7 @@ export const createAssetReader = (
       })
       .catch((error) => {
         if (error.code === "ENOENT") {
-          logger.trace(`MapLibre resource not found: ${url}`);
+          logger.trace(`MapLibre resource not found or empty: ${url}`);
           callback();
           return;
         }

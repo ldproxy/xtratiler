@@ -1,22 +1,32 @@
+import { join } from "path";
 import { pino, Logger as PinoLogger } from "pino";
 import { build as pretty } from "pino-pretty";
-
-/*const fileTransport = pino.transport({
-  target: "pino/file",
-  options: { destination: "/path/to/file", mkdir: true },
-});
-
-const transport = pino.transport({
-  targets: [
-    { target: "/absolute/path/to/my-transport.mjs", level: "error" },
-    { target: "some-file-transport", options: { destination: "/dev/null" } },
-  ],
-});*/
+import roll from "pino-roll";
 
 export type Logger = PinoLogger<never>;
 
-export const createLogger = (verboseLevel: number): Logger =>
-  pino(
+export const createLogger = async (
+  verboseLevel: number,
+  logToFile?: boolean,
+  storePath?: string
+): Promise<Logger> => {
+  let colorize = true;
+  let destination = 1;
+
+  if (logToFile) {
+    colorize = false;
+    destination = await roll({
+      file: storePath
+        ? join(storePath, "logs", "xtratiler")
+        : join("logs", "xtratiler"),
+      extension: ".log",
+      frequency: "daily",
+      limit: { count: 7 },
+      mkdir: true,
+    });
+  }
+
+  return pino(
     {
       level: verboseLevel >= 2 ? "trace" : verboseLevel == 1 ? "debug" : "info",
     },
@@ -26,5 +36,8 @@ export const createLogger = (verboseLevel: number): Logger =>
       customPrettifiers: {
         name: (value, key, log, { colors }) => colors.dim(`${value}`),
       },
+      colorize,
+      destination,
     })
   );
+};

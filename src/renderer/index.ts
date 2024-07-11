@@ -18,7 +18,6 @@ import {
   getStyle,
   Style,
 } from "../style/index.js";
-import { ResourceType } from "../store/common.js";
 import { renderTiles } from "./tiles.js";
 
 const metaMutex = new Mutex();
@@ -64,6 +63,7 @@ export type JobContext = JobParameters & {
 
 type Progress = {
   jobId: string;
+  jobInfo: object;
   started: [number, number];
   total: number;
   current: number;
@@ -71,7 +71,19 @@ type Progress = {
 };
 
 export const render = async (parameters: JobParameters, logger: Logger) => {
-  const { id, minX, maxX, minY, maxY, agent, storage } = parameters;
+  const { id, api, tileset, tmsId, z, minX, maxX, minY, maxY, agent, storage } =
+    parameters;
+
+  const jobInfo = {
+    api,
+    tileset,
+    tmsId,
+    z,
+    minX,
+    maxX,
+    minY,
+    maxY,
+  };
 
   const progress: Progress = {
     jobId: id,
@@ -79,12 +91,13 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     total: (maxX - minX + 1) * (maxY - minY + 1),
     current: 0,
     msg: "",
+    jobInfo,
   };
 
-  logger.info(`Starting rendering job with id ${id}`);
+  logger.info("Starting rendering job: %o", jobInfo);
 
   const progressLogger = setInterval(
-    () => logger.info(progressMessage(progress, "Running")),
+    () => logger.info(progressMessage(progress, "Running"), jobInfo),
     1000
   );
   let progressUpdater;
@@ -118,7 +131,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     clearInterval(progressUpdater);
 
     const duration = process.hrtime(progress.started);
-    logger.info(`Finished rendering job with id ${id} in ${pretty(duration)}`);
+    logger.info(`Finished rendering job in ${pretty(duration)}: %o`, jobInfo);
 
     if (!agent) {
       process.exitCode = 0;
@@ -127,8 +140,8 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     clearInterval(progressLogger);
     clearInterval(progressUpdater);
 
-    logger.error(progressMessage(progress, "Aborted"));
-    logger.error(`Rendering job with id ${id} failed: ${e}`);
+    logger.error(progressMessage(progress, "Aborted"), jobInfo);
+    logger.error(`Rendering job failed with error "${e}": %o`, jobInfo);
 
     if (!agent) {
       process.exitCode = 1;
@@ -211,6 +224,6 @@ const percentDone = (progress: Progress) =>
   Math.round((progress.current / progress.total) * 100);
 
 const progressMessage = (progress: Progress, prefix: string) =>
-  `${prefix} rendering job with id ${progress.jobId}: ${percentDone(
-    progress
-  )}% (${progress.current}/${progress.total})`;
+  `${prefix} rendering job at ${percentDone(progress)}%% (${progress.current}/${
+    progress.total
+  }): %o`;

@@ -5,6 +5,10 @@ import { getTileCenterLonLat, isEdgeTile } from "../util/coordinates.js";
 import { JobContext } from "./index.js";
 import { createAssetReader, AssetReader } from "../store/assets.js";
 
+let shouldBreak = false;
+process.on("SIGINT", () => (shouldBreak = true));
+process.on("SIGTERM", () => (shouldBreak = true));
+
 export const renderTiles = async (jobContext: JobContext) => {
   const { store, z, minX, maxX, minY, maxY, concurrency, logger, incProgress } =
     jobContext;
@@ -21,6 +25,9 @@ export const renderTiles = async (jobContext: JobContext) => {
   await asyncForEach(
     iterator(),
     async (xy: [number, number]) => {
+      if (shouldBreak) {
+        return;
+      }
       await renderTile(z, xy[0], xy[1], assetReader, jobContext);
       incProgress();
     },
@@ -65,13 +72,13 @@ const renderTile = async (
       exists = false;
     }
     if (exists) {
-      logger.debug(`Tile ${z}/${x}/${y} already exists, skipping`);
+      logger.debug(`Tile ${z}/${y}/${x} already exists, skipping`);
       return;
     }
   }
 
   logger.debug(
-    `Rendering tile ${z}/${x}/${y} with size ${tms.tileSize * ratio}px`
+    `Rendering tile ${z}/${y}/${x} with size ${tms.tileSize * ratio}px`
   );
 
   try {
@@ -102,6 +109,6 @@ const renderTile = async (
       await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
     }
   } catch (e) {
-    logger.warn("Error rendering tile %s/%s/%s: %s", z, x, y, e);
+    logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
   }
 };
