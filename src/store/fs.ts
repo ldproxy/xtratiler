@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import { join, dirname } from "path";
+import { Mutex } from "async-mutex";
 import { Logger } from "../util/index.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
@@ -492,6 +493,7 @@ export const createStoreFsExplicit = async (
     logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
   };
 
+  const mutex = new Mutex();
   const mbtiles = new Map<string, MBTiles>();
 
   const getMbtiles = async (
@@ -499,24 +501,26 @@ export const createStoreFsExplicit = async (
     writable?: boolean,
     forceXyz?: boolean
   ): Promise<MBTiles> => {
-    if (mbtiles.has(path)) {
-      return mbtiles.get(path) as MBTiles;
-    }
+    return mutex.runExclusive(async () => {
+      if (mbtiles.has(path)) {
+        return mbtiles.get(path) as MBTiles;
+      }
 
-    const mbt = await openMbtiles(path, writable, forceXyz);
-    mbtiles.set(path, mbt);
+      const mbt = await openMbtiles(path, writable, forceXyz);
+      mbtiles.set(path, mbt);
 
-    if (writable) {
-      await mbt.putInfo({
-        name: path.substring(path.lastIndexOf("/") + 1),
-        format: "png",
-      });
-    }
+      if (writable) {
+        await mbt.putInfo({
+          name: path.substring(path.lastIndexOf("/") + 1),
+          format: "png",
+        });
+      }
 
-    const info = await mbt.getInfo();
-    //console.log("INFO", info);
+      const info = await mbt.getInfo();
+      //console.log("INFO", info);
 
-    return mbt;
+      return mbt;
+    });
   };
 
   const close = async () => {

@@ -1,5 +1,6 @@
 import MBTilesOrig from "@mapbox/mbtiles";
 import zlib from "node:zlib";
+import { Mutex } from "async-mutex";
 
 export type MBTiles = {
   getTile: (z: number, x: number, y: number) => Promise<Buffer>;
@@ -10,15 +11,80 @@ export type MBTiles = {
   close: () => Promise<void>;
 };
 
+type MBTilesRef = MBTiles & {
+  refCount: number;
+};
+
+const mutex = new Mutex();
+const mbtilesRegistry = new Map<string, MBTilesRef>();
+
 export const openMbtiles = async (
   mbtilesFile: string,
   writable?: boolean,
   forceXyz?: boolean
 ): Promise<MBTiles> => {
-  const mode = `?mode=${writable ? "rwc" : "ro"}`;
+  return getMbtilesRef(mbtilesFile, writable, forceXyz);
+};
 
+const getMbtilesRef = async (
+  path: string,
+  writable?: boolean,
+  forceXyz?: boolean
+): Promise<MBTilesRef> => {
+  return mutex.runExclusive(async () => {
+    const mode = `?mode=${writable ? "rwc" : "ro"}`;
+    const mbtilesFile = path + mode;
+
+    if (mbtilesRegistry.has(mbtilesFile)) {
+      const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
+      mbtiles.refCount++;
+
+      //console.log("REF INC", mbtilesFile, mbtiles.refCount);
+
+      return mbtiles;
+    }
+
+    const mbtiles = await open(mbtilesFile, writable, forceXyz);
+    mbtilesRegistry.set(mbtilesFile, mbtiles);
+
+    //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
+
+    return mbtiles;
+  });
+};
+
+const putMbtilesRef = async (mbtilesFile: string): Promise<boolean> => {
+  return mutex.runExclusive(async () => {
+    if (mbtilesRegistry.has(mbtilesFile)) {
+      const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
+      mbtiles.refCount--;
+
+      //console.log("REF DEC", mbtilesFile, mbtiles.refCount);
+
+      if (mbtiles.refCount === 0) {
+        mbtilesRegistry.delete(mbtilesFile);
+
+        /*console.log("REF DEL", mbtilesFile, mbtiles.refCount);
+
+        if (mbtilesRegistry.size === 0) {
+          console.log("REF CLEAR");
+        }*/
+
+        return true;
+      }
+    }
+
+    return false;
+  });
+};
+
+const open = async (
+  mbtilesFile: string,
+  writable?: boolean,
+  forceXyz?: boolean
+): Promise<MBTilesRef> => {
   return new Promise((resolve, reject) => {
-    new MBTilesOrig(mbtilesFile + mode, (err: any, mbtiles: any) => {
+    new MBTilesOrig(mbtilesFile, (err: any, mbtiles: any) => {
       if (err) {
         return reject(err);
       }
@@ -29,20 +95,22 @@ export const openMbtiles = async (
             return reject(err2);
           }
 
-          return resolve(wrap(mbtiles, true, forceXyz));
+          return resolve(wrap(mbtiles, mbtilesFile, true, forceXyz));
         });
       }
 
-      return resolve(wrap(mbtiles, false, false));
+      return resolve(wrap(mbtiles, mbtilesFile, false, false));
     });
   });
 };
 
 const wrap = (
   mbtiles: any,
+  mbtilesFile: string,
   writable: boolean | undefined,
   forceXyz: boolean | undefined
-): MBTiles => ({
+): MBTilesRef => ({
+  refCount: 1,
   getTile: (z: number, x: number, y: number) => {
     return new Promise((resolve, reject) => {
       mbtiles.getTile(z, x, y, (err: any, data: any, headers: any) => {
@@ -115,7 +183,13 @@ const wrap = (
       );
     });
   },
-  close: () => {
+  close: async () => {
+    const doClose = await putMbtilesRef(mbtilesFile);
+
+    if (!doClose) {
+      return;
+    }
+
     return new Promise((resolve, reject) => {
       if (writable) {
         return mbtiles.stopWriting((err: any) => {

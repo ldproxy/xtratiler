@@ -105,7 +105,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     logger: await createLogger(argv2.verbose, argv2.fileLog, argv2.store),
   };
 
-  const tps = await findEntityPaths(agent.storePath);
+  /*const tps = await findEntityPaths(agent.storePath);
   for (const tp of tps) {
     const api = basename(tp, "-tiles.yml");
     const provider = await getProviderByPath(tp);
@@ -120,7 +120,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
         break;
       }
     }
-  }
+  }*/
 
   readFromQueue(agent)
     .then(() => {
