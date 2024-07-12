@@ -1,6 +1,6 @@
 import MBTilesOrig from "@mapbox/mbtiles";
 import zlib from "node:zlib";
-import { Mutex } from "async-mutex";
+import { Mutex, MutexInterface } from "async-mutex";
 
 export type MBTiles = {
   getTile: (z: number, x: number, y: number) => Promise<Buffer>;
@@ -21,14 +21,16 @@ const mbtilesRegistry = new Map<string, MBTilesRef>();
 export const openMbtiles = async (
   mbtilesFile: string,
   writable?: boolean,
+  concurrent?: boolean,
   forceXyz?: boolean
 ): Promise<MBTiles> => {
-  return getMbtilesRef(mbtilesFile, writable, forceXyz);
+  return getMbtilesRef(mbtilesFile, writable, concurrent, forceXyz);
 };
 
 const getMbtilesRef = async (
   path: string,
   writable?: boolean,
+  concurrent?: boolean,
   forceXyz?: boolean
 ): Promise<MBTilesRef> => {
   return mutex.runExclusive(async () => {
@@ -44,7 +46,7 @@ const getMbtilesRef = async (
       return mbtiles;
     }
 
-    const mbtiles = await open(mbtilesFile, writable, forceXyz);
+    const mbtiles = await open(mbtilesFile, writable, concurrent, forceXyz);
     mbtilesRegistry.set(mbtilesFile, mbtiles);
 
     //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
@@ -81,6 +83,7 @@ const putMbtilesRef = async (mbtilesFile: string): Promise<boolean> => {
 const open = async (
   mbtilesFile: string,
   writable?: boolean,
+  concurrent?: boolean,
   forceXyz?: boolean
 ): Promise<MBTilesRef> => {
   return new Promise((resolve, reject) => {
@@ -95,109 +98,94 @@ const open = async (
             return reject(err2);
           }
 
-          return resolve(wrap(mbtiles, mbtilesFile, true, forceXyz));
+          return resolve(
+            wrap(mbtiles, mbtilesFile, true, concurrent, forceXyz)
+          );
         });
       }
 
-      return resolve(wrap(mbtiles, mbtilesFile, false, false));
+      return resolve(wrap(mbtiles, mbtilesFile, false, concurrent, false));
     });
   });
+};
+
+const runExclusive: <T>(
+  mutex: Mutex | undefined,
+  callback: () => Promise<T>
+) => Promise<T> = (mutex, callback) => {
+  if (mutex) {
+    return mutex.runExclusive(callback);
+  }
+
+  return callback();
 };
 
 const wrap = (
   mbtiles: any,
   mbtilesFile: string,
   writable: boolean | undefined,
+  concurrent: boolean | undefined,
   forceXyz: boolean | undefined
-): MBTilesRef => ({
-  refCount: 1,
-  getTile: (z: number, x: number, y: number) => {
-    return new Promise((resolve, reject) => {
-      mbtiles.getTile(z, x, y, (err: any, data: any, headers: any) => {
-        if (err) {
-          if (err.message === "Tile does not exist") {
-            err.code = "ENOENT";
-          }
-          return reject(err);
-        }
+): MBTilesRef => {
+  const mutex = writable && concurrent ? new Mutex() : undefined;
 
-        return zlib.unzip(data, (unzipErr, unzippedData) => {
-          if (unzipErr) {
-            return reject(unzipErr);
+  return {
+    refCount: 1,
+    getTile: (z: number, x: number, y: number) => {
+      return new Promise((resolve, reject) => {
+        mbtiles.getTile(z, x, y, (err: any, data: any, headers: any) => {
+          if (err) {
+            if (err.message === "Tile does not exist") {
+              err.code = "ENOENT";
+            }
+            return reject(err);
           }
 
-          return resolve(unzippedData);
+          return zlib.unzip(data, (unzipErr, unzippedData) => {
+            if (unzipErr) {
+              return reject(unzipErr);
+            }
+
+            return resolve(unzippedData);
+          });
         });
       });
-    });
-  },
-  getInfo: () => {
-    return new Promise((resolve, reject) => {
-      mbtiles.getInfo((err: any, info: any) => {
-        if (err) {
-          return reject(err);
-        }
-
-        return resolve(info);
-      });
-    });
-  },
-  hasTile: (z: number, x: number, y: number) => {
-    return new Promise((resolve, reject) => {
-      const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
-
-      mbtiles.getTile(z, x, row, (err: any) => {
-        if (err) {
-          return resolve(false);
-        }
-
-        return resolve(true);
-      });
-    });
-  },
-  putTile: (z: number, x: number, y: number, buffer: Buffer) => {
-    return new Promise((resolve, reject) => {
-      const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
-
-      mbtiles.putTile(z, x, row, buffer, (err: any) => {
-        if (err) {
-          return reject(err);
-        }
-
-        return resolve();
-      });
-    });
-  },
-  putInfo: (data: Buffer) => {
-    return new Promise((resolve, reject) => {
-      mbtiles.putInfo(
-        //TODO: overwritten by @mapbox/mbtiles
-        { ...data, scheme: forceXyz ? "xyz" : "tms" },
-        (err: any) => {
+    },
+    getInfo: () => {
+      return new Promise((resolve, reject) => {
+        mbtiles.getInfo((err: any, info: any) => {
           if (err) {
             return reject(err);
           }
 
-          return resolve();
-        }
-      );
-    });
-  },
-  close: async () => {
-    const doClose = await putMbtilesRef(mbtilesFile);
+          return resolve(info);
+        });
+      });
+    },
+    hasTile: (z: number, x: number, y: number) => {
+      return runExclusive(mutex, async () => {
+        return new Promise((resolve, reject) => {
+          const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
 
-    if (!doClose) {
-      return;
-    }
+          mbtiles.getTile(z, x, row, (err: any) => {
+            if (err) {
+              return resolve(false);
+            }
 
-    return new Promise((resolve, reject) => {
-      if (writable) {
-        return mbtiles.stopWriting((err: any) => {
-          if (err) {
-            return reject(err);
-          }
+            return resolve(true);
+          });
+        });
+      });
+    },
+    putTile: (z: number, x: number, y: number, buffer: Buffer) => {
+      if (!writable) {
+        throw new Error(`${mbtilesFile} not writable`);
+      }
+      return runExclusive(mutex, async () => {
+        return new Promise((resolve, reject) => {
+          const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
 
-          return mbtiles.close((err: any) => {
+          mbtiles.putTile(z, x, row, buffer, (err: any) => {
             if (err) {
               return reject(err);
             }
@@ -205,15 +193,60 @@ const wrap = (
             return resolve();
           });
         });
+      });
+    },
+    putInfo: (data: Buffer) => {
+      if (!writable) {
+        throw new Error(`${mbtilesFile} not writable`);
+      }
+      return runExclusive(mutex, async () => {
+        return new Promise((resolve, reject) => {
+          mbtiles.putInfo(
+            //TODO: overwritten by @mapbox/mbtiles
+            { ...data, scheme: forceXyz ? "xyz" : "tms" },
+            (err: any) => {
+              if (err) {
+                return reject(err);
+              }
+
+              return resolve();
+            }
+          );
+        });
+      });
+    },
+    close: async () => {
+      const doClose = await putMbtilesRef(mbtilesFile);
+
+      if (!doClose) {
+        return;
       }
 
-      return mbtiles.close((err: any) => {
-        if (err) {
-          return reject(err);
+      return new Promise((resolve, reject) => {
+        if (writable) {
+          return mbtiles.stopWriting((err: any) => {
+            if (err) {
+              return reject(err);
+            }
+
+            return mbtiles.close((err: any) => {
+              if (err) {
+                return reject(err);
+              }
+
+              return resolve();
+            });
+          });
         }
 
-        return resolve();
+        return mbtiles.close((err: any) => {
+          if (err) {
+            return reject(err);
+          }
+
+          return resolve();
+        });
       });
-    });
-  },
-});
+    },
+  };
+};

@@ -17,21 +17,9 @@ import {
   TileMatrixSet,
   getStyle,
   Style,
+  getStyleId,
 } from "../style/index.js";
 import { renderTiles } from "./tiles.js";
-
-const metaMutex = new Mutex();
-const mutexes: Map<string, Mutex> = new Map();
-
-const getMutex = async (identifier: string) =>
-  metaMutex.runExclusive(async () => {
-    let mutex = mutexes.get(identifier);
-    if (!mutex) {
-      mutex = new Mutex();
-      mutexes.set(identifier, mutex);
-    }
-    return mutex;
-  });
 
 export type JobParameters = {
   id: string;
@@ -56,7 +44,6 @@ export type JobContext = JobParameters & {
   store: Store;
   tms: TileMatrixSet;
   style: Style;
-  mutex: Mutex | undefined;
   logger: Logger;
   incProgress: () => void;
 };
@@ -74,9 +61,14 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
   const { id, api, tileset, tmsId, z, minX, maxX, minY, maxY, agent, storage } =
     parameters;
 
+  const styleId = getStyleId(
+    storage.type === StorageType.DETECT
+      ? (storage as StorageDetect).styleRel
+      : (storage as StorageExplicit).style
+  );
   const jobInfo = {
     api,
-    tileset,
+    tileset: `${tileset}_${styleId}`,
     tmsId,
     z,
     minX,
@@ -174,14 +166,12 @@ const createContextDetect = async (
 
   const tms = getTileMatrixSet(tmsId);
   const style = await getStyle(store, storage.styleRel, tmsId, logger);
-  const mutex = undefined;
 
   return {
     ...parameters,
     store,
     tms,
     style,
-    mutex,
     logger,
     incProgress: () => progress.current++,
   };
@@ -205,16 +195,12 @@ const createContextExplicit = async (
 
   const tms = getTileMatrixSet(tmsId);
   const style = await getStyle(store, storage.style, tmsId, logger);
-  const key = storage.style + tileset + tmsId;
-  const mutex =
-    concurrency > 1 && !store.perTile ? await getMutex(key) : undefined;
 
   return {
     ...parameters,
     store,
     tms,
     style,
-    mutex,
     logger,
     incProgress: () => progress.current++,
   };

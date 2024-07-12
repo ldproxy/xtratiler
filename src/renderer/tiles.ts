@@ -40,34 +40,19 @@ const renderTile = async (
   x: number,
   y: number,
   assetReader: AssetReader,
-  {
-    style,
-    store,
-    tms,
-    ratio,
-    overwrite,
-    mbtilesForceXyz,
-    mutex,
-    logger,
-  }: JobContext
+  { style, store, tms, ratio, overwrite, mbtilesForceXyz, logger }: JobContext
 ) => {
   if (!overwrite) {
     let exists = false;
     try {
-      if (mutex) {
-        exists = await mutex.runExclusive(async () =>
-          store.hasTile(style.id, tms.name, z, x, y, mbtilesForceXyz)
-        );
-      } else {
-        exists = await store.hasTile(
-          style.id,
-          tms.name,
-          z,
-          x,
-          y,
-          mbtilesForceXyz
-        );
-      }
+      exists = await store.hasTile(
+        style.id,
+        tms.name,
+        z,
+        x,
+        y,
+        mbtilesForceXyz
+      );
     } catch (e) {
       exists = false;
     }
@@ -101,13 +86,7 @@ const renderTile = async (
       logger
     );
 
-    if (mutex) {
-      await mutex.runExclusive(async () =>
-        store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz)
-      );
-    } else {
-      await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
-    }
+    await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
   } catch (e) {
     logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
   }
