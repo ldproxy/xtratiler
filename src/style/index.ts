@@ -41,16 +41,19 @@ export const getTileMatrixSet = (tmsId: string): TileMatrixSet => {
   return tms;
 };
 
+export const getStyleId = (stylePath: string): string =>
+  stylePath.substring(
+    stylePath.lastIndexOf("/") + 1,
+    stylePath.lastIndexOf(".")
+  );
+
 export const getStyle = async (
   store: Store,
   stylePath: string,
   tmsId: string,
   logger: Logger
 ): Promise<Style> => {
-  const styleId = stylePath.substring(
-    stylePath.indexOf("/") + 1,
-    stylePath.indexOf(".")
-  );
+  const styleId = getStyleId(stylePath);
 
   const tms = tileMatrixSets[tmsId];
 

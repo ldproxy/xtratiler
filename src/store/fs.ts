@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import fsSync from "fs";
 import { join, dirname } from "path";
 import { Mutex } from "async-mutex";
 import { Logger } from "../util/index.js";
@@ -295,7 +296,7 @@ export const createStoreFs = async (
       return mbtiles.get(path) as MBTiles;
     }
 
-    const mbt = await openMbtiles(path, writable, forceXyz);
+    const mbt = await openMbtiles(path, writable, true, forceXyz);
     mbtiles.set(path, mbt);
 
     if (writable) {
@@ -338,9 +339,27 @@ export const createStoreFsExplicit = async (
   storage: StorageExplicit,
   logger: Logger
 ): Promise<Store> => {
+  const vectorPath = storage.vector.startsWith("[")
+    ? storage.vector
+        .substring(1, storage.vector.length - 1)
+        .split(",")
+        .map((path) => join(storeDir, path))
+        .find((path) => fsSync.existsSync(path)) || ""
+    : join(storeDir, storage.vector);
+  const rasterPathExisting = storage.raster.startsWith("[")
+    ? storage.raster
+        .substring(1, storage.raster.length - 1)
+        .split(",")
+        .map((path) => join(storeDir, path))
+        .find((path) => fsSync.existsSync(path)) || ""
+    : join(storeDir, storage.raster);
+  const rasterPath = storage.raster.startsWith("[")
+    ? join(storeDir, storage.raster.substring(1, storage.raster.indexOf(",")))
+    : join(storeDir, storage.raster);
+
   const path: Store["path"] = (type, relPath) => {
     if (type === ResourceType.Tile) {
-      return join(storeDir, storage.vector);
+      return vectorPath;
     }
     if (type === ResourceType.Style) {
       return join(storeDir, storage.style);
@@ -379,7 +398,7 @@ export const createStoreFsExplicit = async (
   const readTile = async (relPath: string) => {
     const tile = relPath.split("/");
     const zyx = tile.slice(1).map((d) => parseInt(d));
-    let tilePath = join(storeDir, storage.vector);
+    let tilePath = vectorPath;
 
     //TODO
     if (isPerTile2(storage)) {
@@ -419,7 +438,7 @@ export const createStoreFsExplicit = async (
     forceXyz: boolean
   ): Promise<boolean> => {
     if (isPerTile2(storage)) {
-      const tilePath = join(storeDir, storage.raster)
+      const tilePath = rasterPathExisting
         .replace("{row}", `${y}`)
         .replace("{col}", `${x}`);
 
@@ -435,7 +454,7 @@ export const createStoreFsExplicit = async (
       return exists;
     }
 
-    const tilePath = join(storeDir, storage.raster);
+    const tilePath = rasterPathExisting;
 
     let exists = false;
 
@@ -468,7 +487,7 @@ export const createStoreFsExplicit = async (
     forceXyz: boolean
   ): Promise<void> => {
     if (isPerTile2(storage)) {
-      const tilePath = join(storeDir, storage.raster)
+      const tilePath = rasterPath
         .replace("{row}", `${y}`)
         .replace("{col}", `${x}`);
 
@@ -481,7 +500,7 @@ export const createStoreFsExplicit = async (
       return;
     }
 
-    const tilePath = join(storeDir, storage.raster);
+    const tilePath = rasterPath;
 
     await fs.mkdir(dirname(tilePath), {
       recursive: true,
@@ -506,7 +525,12 @@ export const createStoreFsExplicit = async (
         return mbtiles.get(path) as MBTiles;
       }
 
-      const mbt = await openMbtiles(path, writable, forceXyz);
+      const mbt = await openMbtiles(
+        path,
+        writable,
+        storage.tileStorage === "PER_TILESET",
+        forceXyz
+      );
       mbtiles.set(path, mbt);
 
       if (writable) {
