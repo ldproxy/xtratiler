@@ -346,13 +346,40 @@ export const createStoreFsExplicit = async (
         .map((path) => join(storeDir, path))
         .find((path) => fsSync.existsSync(path)) || ""
     : join(storeDir, storage.vector);
-  const rasterPathExisting = storage.raster.startsWith("[")
-    ? storage.raster
-        .substring(1, storage.raster.length - 1)
-        .split(",")
-        .map((path) => join(storeDir, path))
-        .find((path) => fsSync.existsSync(path)) || ""
-    : join(storeDir, storage.raster);
+  const vectorPathExisting = (row: number, col: number) =>
+    storage.vector.startsWith("[")
+      ? storage.vector
+          .substring(1, storage.vector.length - 1)
+          .split(",")
+          .map((path) =>
+            join(
+              storeDir,
+              path.replace("{row}", `${row}`).replace("{col}", `${col}`)
+            )
+          )
+          .find((path) => fsSync.existsSync(path)) || ""
+      : join(storeDir, storage.vector);
+  const rasterPathExisting = () =>
+    storage.raster.startsWith("[")
+      ? storage.raster
+          .substring(1, storage.raster.length - 1)
+          .split(",")
+          .map((path) => join(storeDir, path))
+          .find((path) => fsSync.existsSync(path)) || ""
+      : join(storeDir, storage.raster);
+  const rasterPathExisting2 = (row: number, col: number) =>
+    storage.raster.startsWith("[")
+      ? storage.raster
+          .substring(1, storage.raster.length - 1)
+          .split(",")
+          .map((path) =>
+            join(
+              storeDir,
+              path.replace("{row}", `${row}`).replace("{col}", `${col}`)
+            )
+          )
+          .find((path) => fsSync.existsSync(path)) || ""
+      : join(storeDir, storage.raster);
   const rasterPath = storage.raster.startsWith("[")
     ? join(storeDir, storage.raster.substring(1, storage.raster.indexOf(",")))
     : join(storeDir, storage.raster);
@@ -402,9 +429,7 @@ export const createStoreFsExplicit = async (
 
     //TODO
     if (isPerTile2(storage)) {
-      return fs.readFile(
-        tilePath.replace("{row}", `${zyx[1]}`).replace("{col}", `${zyx[2]}`)
-      );
+      return fs.readFile(vectorPathExisting(zyx[1], zyx[2]));
     }
 
     if (tilePath.includes("{partition}")) {
@@ -438,9 +463,7 @@ export const createStoreFsExplicit = async (
     forceXyz: boolean
   ): Promise<boolean> => {
     if (isPerTile2(storage)) {
-      const tilePath = rasterPathExisting
-        .replace("{row}", `${y}`)
-        .replace("{col}", `${x}`);
+      const tilePath = rasterPathExisting2(y, x);
 
       let exists = false;
 
@@ -454,7 +477,7 @@ export const createStoreFsExplicit = async (
       return exists;
     }
 
-    const tilePath = rasterPathExisting;
+    const tilePath = rasterPathExisting();
 
     let exists = false;
 
