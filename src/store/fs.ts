@@ -358,7 +358,10 @@ export const createStoreFsExplicit = async (
             )
           )
           .find((path) => fsSync.existsSync(path)) || ""
-      : join(storeDir, storage.vector);
+      : join(
+          storeDir,
+          storage.vector.replace("{row}", `${row}`).replace("{col}", `${col}`)
+        );
   const rasterPathExisting = () =>
     storage.raster.startsWith("[")
       ? storage.raster
@@ -379,7 +382,10 @@ export const createStoreFsExplicit = async (
             )
           )
           .find((path) => fsSync.existsSync(path)) || ""
-      : join(storeDir, storage.raster);
+      : join(
+          storeDir,
+          storage.raster.replace("{row}", `${row}`).replace("{col}", `${col}`)
+        );
   const rasterPath = storage.raster.startsWith("[")
     ? join(storeDir, storage.raster.substring(1, storage.raster.indexOf(",")))
     : join(storeDir, storage.raster);
@@ -429,7 +435,11 @@ export const createStoreFsExplicit = async (
 
     //TODO
     if (isPerTile2(storage)) {
-      return fs.readFile(vectorPathExisting(zyx[1], zyx[2]));
+      tilePath = vectorPathExisting(zyx[1], zyx[2]);
+
+      logger.trace(`-> tile ${tilePath}`);
+
+      return fs.readFile(tilePath);
     }
 
     if (tilePath.includes("{partition}")) {
