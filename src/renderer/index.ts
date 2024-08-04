@@ -37,7 +37,7 @@ export type JobParameters = {
   mbtilesForceXyz: boolean;
   storage: Storage;
   agent: boolean;
-  updateProgress: (progress: Progress) => void;
+  updateProgress: (progress: Progress, last?: boolean) => Promise<void>;
 };
 
 export type JobContext = JobParameters & {
@@ -50,11 +50,21 @@ export type JobContext = JobParameters & {
 
 type Progress = {
   jobId: string;
-  jobInfo: object;
   started: [number, number];
   total: number;
   current: number;
+  last: number;
   msg: string;
+  jobInfo: {
+    api: string;
+    tileset: string;
+    tmsId: string;
+    z: number;
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  };
 };
 
 export const render = async (parameters: JobParameters, logger: Logger) => {
@@ -82,6 +92,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     started: process.hrtime(),
     total: (maxX - minX + 1) * (maxY - minY + 1),
     current: 0,
+    last: 0,
     msg: "",
     jobInfo,
   };
@@ -93,6 +104,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     1000
   );
   let progressUpdater;
+  let lastUpdate: Promise<void> = Promise.resolve();
 
   let store2: Store | undefined;
   try {
@@ -112,8 +124,10 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
           );
     store2 = jobContext.store;
 
+    //TODO: if style.sources.any(source => source.maxzoom < parameters.z-1) -> skip
+
     progressUpdater = setInterval(
-      () => jobContext.updateProgress(progress),
+      () => (lastUpdate = jobContext.updateProgress(progress)),
       5000
     );
 
@@ -124,6 +138,8 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
 
     const duration = process.hrtime(progress.started);
     logger.info(`Finished rendering job in ${pretty(duration)}: %o`, jobInfo);
+
+    await lastUpdate.finally(() => jobContext.updateProgress(progress, true));
 
     if (!agent) {
       process.exitCode = 0;

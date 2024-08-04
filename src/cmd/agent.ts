@@ -234,11 +234,21 @@ const processJob = async (agent: Agent, job: any) => {
     mbtilesForceXyz: false,
     storage,
     agent: true,
-    updateProgress: (progress) => {
+    updateProgress: (progress, last) => {
       agent.logger.debug("Updating job progress: %s", job.id);
-      fetch(`${agent.queueUrl}/${job.id}`, {
+
+      const current = last ? progress.total : progress.current;
+      const delta = current - progress.last;
+      progress.last = current;
+
+      return fetch(`${agent.queueUrl}/${job.id}`, {
         method: "POST",
-        body: JSON.stringify({ current: progress.current }),
+        body: JSON.stringify({
+          tileSet: progress.jobInfo.tileset,
+          tileMatrixSet: progress.jobInfo.tmsId,
+          level: progress.jobInfo.z,
+          delta: delta,
+        }),
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
