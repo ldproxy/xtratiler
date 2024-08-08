@@ -17,8 +17,8 @@ export const createLogger = async (
     colorize = false;
     destination = await roll({
       file: storePath
-        ? join(storePath, "logs", "xtratiler")
-        : join("logs", "xtratiler"),
+        ? join(storePath, "log", "xtratiler")
+        : join("log", "xtratiler"),
       extension: ".log",
       frequency: "daily",
       limit: { count: 7 },
