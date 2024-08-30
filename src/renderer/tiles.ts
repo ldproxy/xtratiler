@@ -69,13 +69,13 @@ const renderTile = async (
   try {
     const resultEdgeTile = isEdgeTile(z, x, y);
     const bufferX = z === 0 ? 0 : tms.tileSize;
-    const bufferY = resultEdgeTile.y ? 0 : tms.tileSize;
+    const bufferY = z === 0 || resultEdgeTile.y ? 0 : tms.tileSize;
 
     const png = await renderImage(
       {
         assetReader,
         style: style.spec,
-        zoom: Math.max(z - 1, 0),
+        zoom: z - 1,
         center: getTileCenterLonLat(z, x, y, tms.tileSize),
         width: tms.tileSize + bufferX * 2,
         height: tms.tileSize + bufferY * 2,

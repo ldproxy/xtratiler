@@ -33,8 +33,9 @@ export const createAssetReader = (
       fetch(url)
         .then((response) => response.arrayBuffer())
         .then((arrayBuffer) => {
-          assets.set(url, Buffer.from(arrayBuffer));
-          callback(undefined, { data: Buffer.from(arrayBuffer) });
+          const data = Buffer.from(arrayBuffer);
+          assets.set(url, data);
+          callback(undefined, { data });
         })
         .catch((error) => {
           logger.error(

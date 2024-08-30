@@ -22,7 +22,15 @@ export const renderImage = async (
   params: RenderParameters,
   logger: Logger
 ): Promise<Buffer> => {
-  const resizeFactor = 1;
+  let resizeFactor = 1;
+
+  // For raster zoom 0 create image with double size in raster zoom 1 and resize it.
+  if (params.zoom === -1) {
+    resizeFactor = 0.5;
+    params.width = params.width * 2;
+    params.height = params.height * 2;
+    params.zoom = 0;
+  }
 
   const img = await renderMapLibre(params, logger);
 
