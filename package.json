@@ -19,7 +19,9 @@
     "seamac": "node dist.js --mac && codesign --sign - $(node dist.js --bin-path)",
     "deb": "npm run sea && node deb.js",
     "docker": "npm run sea && node docker.js",
-    "deblin": "docker run -it --rm -v ./:/src --platform=linux/amd64 node:20 /bin/bash -c \"cd /src && rm -rf node_modules && npm install && npm run deb\""
+    "deblin": "docker run -it --rm -v ./:/src --platform=linux/amd64 node:20 /bin/bash -c \"cd /src && rm -rf node_modules && npm install && npm run deb\"",
+    "predocs": "echo '#!/bin/sh\\nnpm run --silent dev -- \"$@\"' > ./build/xt.sh && chmod +x ./build/xt.sh",
+    "docs": "cli-docs-generator --cli=./build/xt.sh --pretty_cli_name=xtratiler --output=./docs/COMMANDS.md -v"
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
@@ -28,6 +30,7 @@
     "@types/node": "^20.12.7",
     "@types/pretty-time": "^1.1.5",
     "@types/yargs": "^17.0.32",
+    "cli-docs-generator": "^1.0.7",
     "debian-packaging": "^0.1.5",
     "download": "^8.0.0",
     "esbuild": "^0.20.2",
