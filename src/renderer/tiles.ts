@@ -86,7 +86,7 @@ const renderTile = async (
       logger
     );
 
-    await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
+    //await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
   } catch (e) {
     logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
   }
