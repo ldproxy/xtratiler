@@ -20,8 +20,7 @@ type RenderParameters = {
 
 export const renderImage = async (
   params: RenderParameters,
-  logger: Logger,
-  map: mapLibre.Map
+  logger: Logger
 ): Promise<Buffer> => {
   let resizeFactor = 1;
 
@@ -33,25 +32,24 @@ export const renderImage = async (
     params.zoom = 0;
   }
 
-  const img = await renderMapLibre(params, logger, map);
+  const img = await renderMapLibre(params, logger);
 
   return await toPNG(img, resizeFactor, params, logger);
 };
 
 const renderMapLibre = async (
   { style, assetReader, zoom, center, width, height, ratio }: RenderParameters,
-  logger: Logger,
-  map: mapLibre.Map
+  logger: Logger
 ): Promise<Uint8Array> => {
   //TODO: only create on Map per job?
-  /*const map = new mapLibre.Map({
+  const map = new mapLibre.Map({
     request: assetReader,
     ratio,
   });
 
   //logger.debug("Render map with style: \n" + JSON.stringify(style, null, 2));
 
-  map.load(style);*/
+  map.load(style);
 
   const options: RenderOptions = {
     zoom,
@@ -73,11 +71,11 @@ const renderMapLibrePromise = async (
 ): Promise<Uint8Array> => {
   return new Promise((resolve, reject) => {
     map.render(options, (error, buffer) => {
-      /*try {
+      try {
         map.release();
       } catch (e) {
         // ignore
-      }*/
+      }
 
       if (error) {
         return reject(error);

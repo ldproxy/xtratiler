@@ -5,37 +5,14 @@ import { getTileCenterLonLat, isEdgeTile } from "../util/coordinates.js";
 import { JobContext } from "./index.js";
 import { createAssetReader, AssetReader } from "../store/assets.js";
 
-import mapLibre, { Map, RenderOptions } from "@maplibre/maplibre-gl-native";
-
 let shouldBreak = false;
 process.on("SIGINT", () => (shouldBreak = true));
 process.on("SIGTERM", () => (shouldBreak = true));
 
 export const renderTiles = async (jobContext: JobContext) => {
-  const {
-    store,
-    z,
-    minX,
-    maxX,
-    minY,
-    maxY,
-    concurrency,
-    logger,
-    incProgress,
-    style,
-    ratio,
-  } = jobContext;
+  const { store, z, minX, maxX, minY, maxY, concurrency, logger, incProgress } =
+    jobContext;
   const assetReader = createAssetReader(store, logger);
-
-  //TODO: only create on Map per job?
-  const map = new mapLibre.Map({
-    request: assetReader,
-    ratio,
-  });
-
-  //logger.debug("Render map with style: \n" + JSON.stringify(style, null, 2));
-
-  map.load(style.spec);
 
   const iterator = function* (): Generator<[number, number]> {
     for (let x = minX; x <= maxX; x++) {
@@ -51,17 +28,11 @@ export const renderTiles = async (jobContext: JobContext) => {
       if (shouldBreak) {
         return;
       }
-      await renderTile(z, xy[0], xy[1], assetReader, jobContext, map);
+      await renderTile(z, xy[0], xy[1], assetReader, jobContext);
       incProgress();
     },
     concurrency
   );
-
-  try {
-    map.release();
-  } catch (e) {
-    // ignore
-  }
 };
 
 const renderTile = async (
@@ -69,8 +40,7 @@ const renderTile = async (
   x: number,
   y: number,
   assetReader: AssetReader,
-  { style, store, tms, ratio, overwrite, mbtilesForceXyz, logger }: JobContext,
-  map: mapLibre.Map
+  { style, store, tms, ratio, overwrite, mbtilesForceXyz, logger }: JobContext
 ) => {
   if (!overwrite) {
     let exists = false;
@@ -113,8 +83,7 @@ const renderTile = async (
         bufferY,
         ratio,
       },
-      logger,
-      map
+      logger
     );
 
     //await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
