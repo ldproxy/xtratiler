@@ -21,6 +21,7 @@ export const createLogger = async (
         : join("log", "xtratiler"),
       extension: ".log",
       frequency: "daily",
+      dateFormat: "yyyy-MM-dd",
       limit: { count: 7 },
       mkdir: true,
     });
@@ -36,6 +37,7 @@ export const createLogger = async (
       customPrettifiers: {
         name: (value, key, log, { colors }) => colors.dim(`${value}`),
       },
+      translateTime: "yyyy-mm-dd HH:MM:ss.l",
       colorize,
       destination,
     })
