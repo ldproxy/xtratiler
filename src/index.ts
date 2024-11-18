@@ -1,5 +1,7 @@
 if (process.env.XTRATILER_INSTRUMENTATION === "true") {
-  await import("./util/instrumentation.js");
+  (async () => {
+    await import("./util/instrumentation.js");
+  })();
 }
 
 import yargs from "yargs";
