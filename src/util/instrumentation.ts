@@ -23,8 +23,8 @@ import {
 } from "@opentelemetry/core";
 import { mkdirSync, writeFileSync } from "fs";
 
-//import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
-//diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 export class FileSpanExporter implements SpanExporter {
   private _fileCount: number;

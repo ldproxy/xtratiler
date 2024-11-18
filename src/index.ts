@@ -1,3 +1,7 @@
+if (process.env.XTRATILER_INSTRUMENTATION === "true") {
+  await import("./util/instrumentation.js");
+}
+
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import cmds from "./cmd/index.js";

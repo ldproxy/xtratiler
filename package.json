@@ -10,7 +10,7 @@
     "v": "node --version",
     "build": "node build.js",
     "start": "npm run build && node ./build/bin/index.cjs",
-    "dev": "tsx --import ./src/util/instrumentation.ts ./src/index.ts",
+    "dev": "XTRATILER_INSTRUMENTATION=true tsx ./src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rimraf build && rimraf dist",
     "presea": "npm run build && node dist.js --pre && node --experimental-sea-config $(node dist.js --sea-path)",
@@ -73,6 +73,6 @@
     "yargs": "^17.7.2"
   },
   "resolutions": {
-    "sqlite3": "5.1.7"  
+    "sqlite3": "5.1.7"
   }
 }
