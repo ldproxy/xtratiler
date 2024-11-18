@@ -10,7 +10,7 @@
     "v": "node --version",
     "build": "node build.js",
     "start": "npm run build && node ./build/bin/index.cjs",
-    "dev": "tsx ./src/index.ts",
+    "dev": "tsx --import ./src/util/instrumentation.ts ./src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rimraf build && rimraf dist",
     "presea": "npm run build && node dist.js --pre && node --experimental-sea-config $(node dist.js --sea-path)",
@@ -24,6 +24,14 @@
     "docs": "cli-docs-generator --cli=./build/xt.sh --pretty_cli_name=xtratiler --output=./docs/COMMANDS.md -v"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "^0.54.2",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.54.2",
+    "@opentelemetry/resources": "^1.27.0",
+    "@opentelemetry/sdk-metrics": "^1.27.0",
+    "@opentelemetry/sdk-node": "^0.54.2",
+    "@opentelemetry/sdk-trace-node": "^1.27.0",
+    "@opentelemetry/semantic-conventions": "^1.27.0",
     "@tsconfig/node20": "^20.1.4",
     "@types/js-yaml": "^4.0.9",
     "@types/mapbox__sphericalmercator": "^1.2.3",
@@ -63,5 +71,8 @@
     "promisify-child-process": "^4.1.2",
     "sharp": "^0.33.3",
     "yargs": "^17.7.2"
+  },
+  "resolutions": {
+    "sqlite3": "5.1.7"  
   }
 }

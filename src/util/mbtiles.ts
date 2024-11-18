@@ -1,6 +1,7 @@
 import MBTilesOrig from "@mapbox/mbtiles";
 import zlib from "node:zlib";
 import { Mutex, MutexInterface } from "async-mutex";
+import { trace } from "@opentelemetry/api";
 
 export type MBTiles = {
   getTile: (z: number, x: number, y: number) => Promise<Buffer>;
@@ -14,6 +15,8 @@ export type MBTiles = {
 type MBTilesRef = MBTiles & {
   refCount: number;
 };
+
+const tracer = trace.getTracer("mbtiles");
 
 const mutex = new Mutex();
 const mbtilesRegistry = new Map<string, MBTilesRef>();
@@ -33,25 +36,29 @@ const getMbtilesRef = async (
   concurrent?: boolean,
   forceXyz?: boolean
 ): Promise<MBTilesRef> => {
-  return mutex.runExclusive(async () => {
-    const mode = `?mode=${writable ? "rwc" : "ro"}`;
-    const mbtilesFile = path + mode;
+  return tracer.startActiveSpan("getMbtilesRef", async (span) => {
+    return mutex
+      .runExclusive(async () => {
+        const mode = `?mode=${writable ? "rwc" : "ro"}`;
+        const mbtilesFile = path + mode;
 
-    if (mbtilesRegistry.has(mbtilesFile)) {
-      const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
-      mbtiles.refCount++;
+        if (mbtilesRegistry.has(mbtilesFile)) {
+          const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
+          mbtiles.refCount++;
 
-      //console.log("REF INC", mbtilesFile, mbtiles.refCount);
+          //console.log("REF INC", mbtilesFile, mbtiles.refCount);
 
-      return mbtiles;
-    }
+          return mbtiles;
+        }
 
-    const mbtiles = await open(mbtilesFile, writable, concurrent, forceXyz);
-    mbtilesRegistry.set(mbtilesFile, mbtiles);
+        const mbtiles = await open(mbtilesFile, writable, concurrent, forceXyz);
+        mbtilesRegistry.set(mbtilesFile, mbtiles);
 
-    //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
+        //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
 
-    return mbtiles;
+        return mbtiles;
+      })
+      .finally(() => span.end());
   });
 };
 
@@ -94,13 +101,28 @@ const open = async (
 
       if (writable) {
         return mbtiles.startWriting((err2: any) => {
-          if (err) {
+          if (err2) {
             return reject(err2);
           }
 
-          return resolve(
-            wrap(mbtiles, mbtilesFile, true, concurrent, forceXyz)
-          );
+          mbtiles._db.run("PRAGMA journal_mode = WAL", (err3: any) => {
+            if (err3) {
+              return reject(err3);
+            }
+            mbtiles._db.run("PRAGMA temp_store=MEMORY", (err4: any) => {
+              if (err4) {
+                return reject(err4);
+              }
+              mbtiles._db.run("PRAGMA locking_mode=EXCLUSIVE", (err5: any) => {
+                if (err5) {
+                  return reject(err5);
+                }
+                return resolve(
+                  wrap(mbtiles, mbtilesFile, true, concurrent, forceXyz)
+                );
+              });
+            });
+          });
         });
       }
 
@@ -162,20 +184,26 @@ const wrap = (
         });
       });
     },
+    //TODO: if per_job, get all existing tiles upfront
     hasTile: (z: number, x: number, y: number) => {
-      return runExclusive(mutex, async () => {
-        return new Promise((resolve, reject) => {
-          const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
+      return tracer.startActiveSpan(
+        "mbtiles.hasTile",
+        async (span): Promise<boolean> => {
+          return runExclusive(mutex, async (): Promise<boolean> => {
+            return new Promise((resolve, reject) => {
+              const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
 
-          mbtiles.getTile(z, x, row, (err: any) => {
-            if (err) {
-              return resolve(false);
-            }
+              mbtiles.getTile(z, x, row, (err: any) => {
+                if (err) {
+                  return resolve(false);
+                }
 
-            return resolve(true);
-          });
-        });
-      });
+                return resolve(true);
+              });
+            });
+          }).finally(() => span.end());
+        }
+      );
     },
     putTile: (z: number, x: number, y: number, buffer: Buffer) => {
       if (!writable) {

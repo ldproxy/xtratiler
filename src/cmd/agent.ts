@@ -18,6 +18,7 @@ export type AgentArgs = GlobalArgs & {
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   fileLog: boolean;
+  debugOnlyCompute: boolean;
 };
 
 export const command = "agent";
@@ -75,6 +76,12 @@ export const builder = (yargs: Argv<{}>) => {
       default: false,
       description: "log to file instead of stdout",
       group: "Agent options:",
+    })
+    .option("debug-only-compute", {
+      alias: "d",
+      type: "boolean",
+      default: false,
+      hidden: true,
     });
   /*.example([
       ['$0 --config "~/config.json"', "Use custom config"],
@@ -89,6 +96,7 @@ type Agent = {
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   concurrencyEnabled: boolean;
   connected: boolean;
+  debugOnlyCompute: boolean;
   logger: Logger;
 };
 
@@ -102,6 +110,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     concurrency: argv2.concurrency,
     concurrencyEnabled: true,
     connected: false,
+    debugOnlyCompute: argv2.debugOnlyCompute,
     logger: await createLogger(argv2.verbose, argv2.fileLog, argv2.store),
   };
 
@@ -234,6 +243,7 @@ const processJob = async (agent: Agent, job: any) => {
     mbtilesForceXyz: false,
     storage,
     agent: true,
+    debugOnlyCompute: agent.debugOnlyCompute,
     updateProgress: (progress, last) => {
       agent.logger.debug("Updating job progress: %s", job.id);
 

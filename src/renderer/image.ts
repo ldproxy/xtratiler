@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { Store } from "../store/index.js";
 import { Logger } from "../util/index.js";
 import { AssetReader } from "../store/assets.js";
+import { context, propagation, Tracer } from "@opentelemetry/api";
 
 type RenderParameters = {
   assetReader: AssetReader;
@@ -18,9 +19,15 @@ type RenderParameters = {
   ratio: number;
 };
 
+interface TraceContext {
+  traceparent?: string;
+  tracestate?: string;
+}
+
 export const renderImage = async (
   params: RenderParameters,
-  logger: Logger
+  logger: Logger,
+  tracer: Tracer
 ): Promise<Buffer> => {
   let resizeFactor = 1;
 
@@ -32,18 +39,32 @@ export const renderImage = async (
     params.zoom = 0;
   }
 
-  const img = await renderMapLibre(params, logger);
+  const img = await tracer.startActiveSpan("renderMapLibre", (span) =>
+    renderMapLibre(params, logger).finally(() => span.end())
+  );
 
-  return await toPNG(img, resizeFactor, params, logger);
+  const span = tracer.startSpan("toPNG");
+  const png = await toPNG(img, resizeFactor, params, logger);
+  span.end();
+
+  return png;
 };
 
 const renderMapLibre = async (
   { style, assetReader, zoom, center, width, height, ratio }: RenderParameters,
   logger: Logger
 ): Promise<Uint8Array> => {
+  const traceContext: TraceContext = {};
+  propagation.inject(context.active(), traceContext);
+
   //TODO: only create on Map per job?
   const map = new mapLibre.Map({
-    request: assetReader,
+    request: (request, callback) => {
+      const activeContext = propagation.extract(context.active(), traceContext);
+      context.with(activeContext, () => {
+        assetReader(request, callback);
+      });
+    },
     ratio,
   });
 

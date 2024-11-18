@@ -1,5 +1,6 @@
 import pretty from "pretty-time";
 import { Mutex } from "async-mutex";
+import { trace, Tracer } from "@opentelemetry/api";
 
 import { Logger } from "../util/index.js";
 import {
@@ -37,6 +38,7 @@ export type JobParameters = {
   mbtilesForceXyz: boolean;
   storage: Storage;
   agent: boolean;
+  debugOnlyCompute: boolean;
   updateProgress: (progress: Progress, last?: boolean) => Promise<void>;
 };
 
@@ -45,6 +47,7 @@ export type JobContext = JobParameters & {
   tms: TileMatrixSet;
   style: Style;
   logger: Logger;
+  tracer: Tracer;
   incProgress: () => void;
 };
 
@@ -67,6 +70,8 @@ type Progress = {
   };
 };
 
+const tracer = trace.getTracer("renderer");
+
 export const render = async (parameters: JobParameters, logger: Logger) => {
   const { id, api, tileset, tmsId, z, minX, maxX, minY, maxY, agent, storage } =
     parameters;
@@ -87,80 +92,93 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
     maxY,
   };
 
-  const progress: Progress = {
-    jobId: id,
-    started: process.hrtime(),
-    total: (maxX - minX + 1) * (maxY - minY + 1),
-    current: 0,
-    last: 0,
-    msg: "",
-    jobInfo,
-  };
+  await tracer.startActiveSpan(
+    "render",
+    { attributes: jobInfo },
+    async (span) => {
+      const progress: Progress = {
+        jobId: id,
+        started: process.hrtime(),
+        total: (maxX - minX + 1) * (maxY - minY + 1),
+        current: 0,
+        last: 0,
+        msg: "",
+        jobInfo,
+      };
 
-  logger.info("Starting rendering job: %o", jobInfo);
+      logger.info("Starting rendering job: %o", jobInfo);
 
-  const progressLogger = setInterval(
-    () => logger.info(progressMessage(progress, "Running"), jobInfo),
-    1000
+      const progressLogger = setInterval(
+        () => logger.info(progressMessage(progress, "Running"), jobInfo),
+        1000
+      );
+      let progressUpdater: NodeJS.Timeout | undefined;
+      let lastUpdate: Promise<void> = Promise.resolve();
+
+      let store2: Store | undefined;
+
+      try {
+        const jobContext =
+          storage.type === StorageType.DETECT
+            ? await createContextDetect(
+                parameters,
+                logger,
+                progress,
+                storage as StorageDetect
+              )
+            : await createContextExplicit(
+                parameters,
+                logger,
+                progress,
+                storage as StorageExplicit
+              );
+        store2 = jobContext.store;
+
+        //TODO: if style.sources.any(source => source.maxzoom < parameters.z-1) -> skip
+
+        progressUpdater = setInterval(
+          () => (lastUpdate = jobContext.updateProgress(progress)),
+          5000
+        );
+
+        await renderTiles(jobContext);
+
+        clearInterval(progressLogger);
+        clearInterval(progressUpdater);
+
+        const duration = process.hrtime(progress.started);
+        logger.info(
+          `Finished rendering job in ${pretty(duration)}: %o`,
+          jobInfo
+        );
+
+        await lastUpdate.finally(() =>
+          jobContext.updateProgress(progress, true)
+        );
+
+        if (!agent) {
+          process.exitCode = 0;
+        }
+      } catch (e) {
+        clearInterval(progressLogger);
+        clearInterval(progressUpdater);
+
+        logger.error(progressMessage(progress, "Aborted"), jobInfo);
+        logger.error(`Rendering job failed with error "${e}": %o`, jobInfo);
+
+        if (!agent) {
+          process.exitCode = 1;
+        } else {
+          throw e;
+        }
+      } finally {
+        span.end();
+        if (store2) {
+          await store2.close();
+        }
+      }
+    }
   );
-  let progressUpdater;
-  let lastUpdate: Promise<void> = Promise.resolve();
-
-  let store2: Store | undefined;
-  try {
-    const jobContext =
-      storage.type === StorageType.DETECT
-        ? await createContextDetect(
-            parameters,
-            logger,
-            progress,
-            storage as StorageDetect
-          )
-        : await createContextExplicit(
-            parameters,
-            logger,
-            progress,
-            storage as StorageExplicit
-          );
-    store2 = jobContext.store;
-
-    //TODO: if style.sources.any(source => source.maxzoom < parameters.z-1) -> skip
-
-    progressUpdater = setInterval(
-      () => (lastUpdate = jobContext.updateProgress(progress)),
-      5000
-    );
-
-    await renderTiles(jobContext);
-
-    clearInterval(progressLogger);
-    clearInterval(progressUpdater);
-
-    const duration = process.hrtime(progress.started);
-    logger.info(`Finished rendering job in ${pretty(duration)}: %o`, jobInfo);
-
-    await lastUpdate.finally(() => jobContext.updateProgress(progress, true));
-
-    if (!agent) {
-      process.exitCode = 0;
-    }
-  } catch (e) {
-    clearInterval(progressLogger);
-    clearInterval(progressUpdater);
-
-    logger.error(progressMessage(progress, "Aborted"), jobInfo);
-    logger.error(`Rendering job failed with error "${e}": %o`, jobInfo);
-
-    if (!agent) {
-      process.exitCode = 1;
-    } else {
-      throw e;
-    }
-  } finally {
-    if (store2) {
-      await store2.close();
-    }
-  }
 };
 
 const createContextDetect = async (
@@ -189,6 +207,7 @@ const createContextDetect = async (
     tms,
     style,
     logger,
+    tracer,
     incProgress: () => progress.current++,
   };
 };
@@ -218,6 +237,7 @@ const createContextExplicit = async (
     tms,
     style,
     logger,
+    tracer,
     incProgress: () => progress.current++,
   };
 };
