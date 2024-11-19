@@ -172,10 +172,12 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
           throw e;
         }
       } finally {
-        span.end();
         if (store2) {
-          await store2.close();
+          try {
+            await store2.close();
+          } catch (e) {}
         }
+        span.end();
       }
     }
   );

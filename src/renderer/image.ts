@@ -6,6 +6,12 @@ import { Store } from "../store/index.js";
 import { Logger } from "../util/index.js";
 import { AssetReader } from "../store/assets.js";
 import { context, propagation, Tracer } from "@opentelemetry/api";
+import EventEmitter from "node:events";
+
+const ml: EventEmitter = mapLibre as unknown as EventEmitter;
+ml.on("message", (msg) => {
+  console.log(msg);
+});
 
 type RenderParameters = {
   assetReader: AssetReader;
