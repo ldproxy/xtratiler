@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ❓ Question / Support
+    url: https://github.com/interactive-instruments/ldproxy/discussions/new?category=tools
+    about: Get help on any issues with xtratiler 
+  - name: 📚 View Documentation
+    url: https://docs.ldproxy.net/tools/xtratiler/
+    about: Official xtratiler documentation    

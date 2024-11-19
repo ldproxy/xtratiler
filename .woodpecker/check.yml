@@ -1,0 +1,9 @@
+when:
+  event: push
+
+steps:
+  test:
+    image: node:20
+    commands:
+      - npm ci
+      - npm run build
