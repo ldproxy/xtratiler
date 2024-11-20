@@ -6,7 +6,11 @@ RUN cd /src && npm ci && npm run docker
 
 
 
-FROM ubuntu:22.04
+# FROM ubuntu:22.04
+FROM nvidia/opengl:1.2-glvnd-runtime
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,compat32,utility,display
 
 COPY --from=builder /src/dist/app /app 
 
