@@ -15,10 +15,10 @@ export type GlobalArgs = {
 };
 
 const version = process.env.NODE_ENV === "production" ? "$$VERSION$$" : "DEV";
-//TODO
-const args = cluster.isPrimary
-  ? hideBin(process.argv)
-  : hideBin(process.argv.slice(1));
+const args =
+  process.argv.length > 2 && process.argv[2] === process.argv[1]
+    ? hideBin(process.argv.slice(1))
+    : hideBin(process.argv);
 
 const cli = yargs(args)
   .scriptName("xtratiler")
