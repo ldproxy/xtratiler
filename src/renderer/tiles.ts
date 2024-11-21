@@ -31,7 +31,7 @@ export const renderTiles = async (jobContext: JobContext) => {
       await renderTile(z, xy[0], xy[1], assetReader, jobContext);
       incProgress();
     },
-    concurrency
+    1 //concurrency
   );
 };
 

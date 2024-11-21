@@ -1,10 +1,12 @@
 import { Argv, ArgumentsCamelCase } from "yargs";
-import { basename } from "path";
+import { asyncForEach } from "modern-async";
+import cluster from "node:cluster";
+import { availableParallelism } from "node:os";
+import process from "node:process";
 
 import { GlobalArgs } from "../index.js";
 import { Logger, createLogger } from "../util/index.js";
 import { JobParameters, render } from "../renderer/index.js";
-import { asyncForEach } from "modern-async";
 import {
   findEntityPaths,
   getCaches,
@@ -102,19 +104,34 @@ type Agent = {
 
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<AgentArgs>;
+  const logger = await createLogger(argv2.verbose, argv2.fileLog, argv2.store);
 
-  const agent: Agent = {
-    queueUrl: `${argv2.queueUrl}/api/jobs`,
-    storePath: argv2.store,
-    ratio: argv2.ratio,
-    concurrency: argv2.concurrency,
-    concurrencyEnabled: true,
-    connected: false,
-    debugOnlyCompute: argv2.debugOnlyCompute,
-    logger: await createLogger(argv2.verbose, argv2.fileLog, argv2.store),
-  };
+  if (cluster.isPrimary) {
+    const numWorkers = Math.min(availableParallelism(), argv2.concurrency);
 
-  /*const tps = await findEntityPaths(agent.storePath);
+    logger.info("Starting %d workers", numWorkers);
+
+    // Fork workers.
+    for (let i = 0; i < numWorkers; i++) {
+      cluster.fork();
+    }
+
+    cluster.on("exit", (worker, code, signal) => {
+      logger.debug("Worker with pid %d stopped", process.pid);
+    });
+  } else {
+    const agent: Agent = {
+      queueUrl: `${argv2.queueUrl}/api/jobs`,
+      storePath: argv2.store,
+      ratio: argv2.ratio,
+      concurrency: argv2.concurrency,
+      concurrencyEnabled: true,
+      connected: false,
+      debugOnlyCompute: argv2.debugOnlyCompute,
+      logger,
+    };
+
+    /*const tps = await findEntityPaths(agent.storePath);
   for (const tp of tps) {
     const api = basename(tp, "-tiles.yml");
     const provider = await getProviderByPath(tp);
@@ -131,15 +148,18 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     }
   }*/
 
-  readFromQueue(agent)
-    .then(() => {
-      agent.logger.info("Disconnected from job queue: %s", agent.queueUrl);
-      process.exit(0);
-    })
-    .catch((err) => {
-      agent.logger.error(err);
-      process.exit(1);
-    });
+    readFromQueue(agent)
+      .then(() => {
+        logger.info("Disconnected from job queue: %s", agent.queueUrl);
+        process.exit(0);
+      })
+      .catch((err) => {
+        logger.error(err);
+        process.exit(1);
+      });
+
+    logger.debug("Worker with pid %d started", process.pid);
+  }
 };
 
 async function readFromQueue(agent: Agent) {
@@ -148,7 +168,7 @@ async function readFromQueue(agent: Agent) {
     async (job: any) => {
       await processJob(agent, job);
     },
-    agent.concurrencyEnabled ? agent.concurrency : 1
+    1 //agent.concurrencyEnabled ? agent.concurrency : 1
   );
 }
 
