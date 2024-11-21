@@ -7,7 +7,6 @@ if (process.env.XTRATILER_INSTRUMENTATION === "true") {
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import cmds from "./cmd/index.js";
-import cluster from "cluster";
 
 export type GlobalArgs = {
   verbose: number;

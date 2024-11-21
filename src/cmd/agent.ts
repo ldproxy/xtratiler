@@ -5,7 +5,7 @@ import { availableParallelism } from "node:os";
 import process from "node:process";
 
 import { GlobalArgs } from "../index.js";
-import { Logger, createLogger } from "../util/index.js";
+import { Logger, createLogger } from "../util/logger.js";
 import { JobParameters, render } from "../renderer/index.js";
 import {
   findEntityPaths,

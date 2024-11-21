@@ -1,6 +1,6 @@
 import { RequestResponse, ResourceKind } from "@maplibre/maplibre-gl-native";
 import { Store } from "./index.js";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { ResourceType, getResourceType } from "./common.js";
 import { trace } from "@opentelemetry/api";
 

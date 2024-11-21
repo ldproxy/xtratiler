@@ -3,7 +3,7 @@ import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import sharp from "sharp";
 
 import { Store } from "../store/index.js";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { AssetReader } from "../store/assets.js";
 import { context, propagation, Tracer } from "@opentelemetry/api";
 import EventEmitter from "node:events";

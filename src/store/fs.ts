@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import { join, dirname } from "path";
 import { Mutex } from "async-mutex";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
 import { MBTiles, openMbtiles } from "../util/mbtiles.js";

@@ -2,7 +2,7 @@ import { Argv, ArgumentsCamelCase } from "yargs";
 import confirm from "@inquirer/confirm";
 
 import { JobParameters, render } from "../renderer/index.js";
-import { createLogger } from "../util/index.js";
+import { createLogger } from "../util/logger.js";
 import { GlobalArgs } from "../index.js";
 import { StorageDetect, StorageType } from "../store/index.js";
 
