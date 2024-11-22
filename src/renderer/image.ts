@@ -1,4 +1,4 @@
-import mapLibre, { Map, RenderOptions } from "@maplibre/maplibre-gl-native";
+import mapLibre, { RenderOptions } from "@maplibre/maplibre-gl-native";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import sharp from "sharp";
 
@@ -15,6 +15,7 @@ ml.on("message", (msg) => {
 
 type RenderParameters = {
   assetReader: AssetReader;
+  styleId: string;
   style: StyleSpecification;
   zoom: number;
   center: [number, number];
@@ -56,27 +57,46 @@ export const renderImage = async (
   return png;
 };
 
+const maps = new Map<string, mapLibre.Map>();
+
 const renderMapLibre = async (
-  { style, assetReader, zoom, center, width, height, ratio }: RenderParameters,
+  {
+    styleId,
+    style,
+    assetReader,
+    zoom,
+    center,
+    width,
+    height,
+    ratio,
+  }: RenderParameters,
   logger: Logger
 ): Promise<Uint8Array> => {
   const traceContext: TraceContext = {};
   propagation.inject(context.active(), traceContext);
 
-  //TODO: only create on Map per job?
-  const map = new mapLibre.Map({
-    request: (request, callback) => {
-      const activeContext = propagation.extract(context.active(), traceContext);
-      context.with(activeContext, () => {
-        assetReader(request, callback);
-      });
-    },
-    ratio,
-  });
+  if (!maps.has(styleId)) {
+    //TODO: only create on Map per job?
+    const map = new mapLibre.Map({
+      request: (request, callback) => {
+        const activeContext = propagation.extract(
+          context.active(),
+          traceContext
+        );
+        context.with(activeContext, () => {
+          assetReader(request, callback);
+        });
+      },
+      ratio,
+    });
+
+    maps.set(styleId, map);
+
+    map.load(style);
+  }
+  const map = maps.get(styleId) as mapLibre.Map;
 
   //logger.debug("Render map with style: \n" + JSON.stringify(style, null, 2));
-
-  map.load(style);
 
   const options: RenderOptions = {
     zoom,
@@ -93,7 +113,7 @@ const renderMapLibre = async (
 };
 
 const renderMapLibrePromise = async (
-  map: Map,
+  map: mapLibre.Map,
   options: RenderOptions
 ): Promise<Uint8Array> => {
   return new Promise((resolve, reject) => {

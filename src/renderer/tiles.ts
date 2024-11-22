@@ -90,6 +90,7 @@ const renderTile = async (
         const png = await renderImage(
           {
             assetReader,
+            styleId: store.api + "/" + style.id,
             style: style.spec,
             zoom: z - 1,
             center: getTileCenterLonLat(z, x, y, tms.tileSize),
