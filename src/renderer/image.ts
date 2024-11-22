@@ -59,6 +59,19 @@ export const renderImage = async (
 
 const maps = new Map<string, mapLibre.Map>();
 
+const close = () => {
+  for (const map of maps.values()) {
+    try {
+      map.release();
+    } catch (e) {
+      // ignore
+    }
+  }
+};
+
+process.on("SIGINT", close);
+process.on("SIGTERM", close);
+
 const renderMapLibre = async (
   {
     styleId,
@@ -118,12 +131,6 @@ const renderMapLibrePromise = async (
 ): Promise<Uint8Array> => {
   return new Promise((resolve, reject) => {
     map.render(options, (error, buffer) => {
-      try {
-        map.release();
-      } catch (e) {
-        // ignore
-      }
-
       if (error) {
         return reject(error);
       }
