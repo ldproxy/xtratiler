@@ -1,7 +1,6 @@
 import fs from "fs/promises";
 import fsSync from "fs";
 import { join, dirname } from "path";
-import { Mutex } from "async-mutex";
 import { Logger } from "../util/logger.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
@@ -569,7 +568,6 @@ export const createStoreFsExplicit = async (
     });
   };
 
-  const mutex = new Mutex();
   const mbtiles = new Map<string, MBTiles>();
 
   const getMbtiles = async (
@@ -578,33 +576,33 @@ export const createStoreFsExplicit = async (
     forceXyz?: boolean
   ): Promise<MBTiles> => {
     return tracer.startActiveSpan("getMbtiles", async (span) => {
-      return mutex
-        .runExclusive(async () => {
-          if (mbtiles.has(path)) {
-            return mbtiles.get(path) as MBTiles;
-          }
+      try {
+        if (mbtiles.has(path)) {
+          return mbtiles.get(path) as MBTiles;
+        }
 
-          const mbt = await openMbtiles(
-            path,
-            writable,
-            storage.tileStorage === "PER_TILESET",
-            forceXyz
-          );
-          mbtiles.set(path, mbt);
+        const mbt = await openMbtiles(
+          path,
+          writable,
+          storage.tileStorage === "PER_TILESET",
+          forceXyz
+        );
+        mbtiles.set(path, mbt);
 
-          if (writable) {
-            await mbt.putInfo({
-              name: path.substring(path.lastIndexOf("/") + 1),
-              format: "png",
-            });
-          }
+        if (writable) {
+          await mbt.putInfo({
+            name: path.substring(path.lastIndexOf("/") + 1),
+            format: "png",
+          });
+        }
 
-          const info = await mbt.getInfo();
-          //console.log("INFO", info);
+        const info = await mbt.getInfo();
+        //console.log("INFO", info);
 
-          return mbt;
-        })
-        .finally(() => span.end());
+        return mbt;
+      } finally {
+        span.end();
+      }
     });
   };
 

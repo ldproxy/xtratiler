@@ -1,5 +1,4 @@
 import pretty from "pretty-time";
-import { Mutex } from "async-mutex";
 import { trace, Tracer } from "@opentelemetry/api";
 
 import { Logger } from "../util/logger.js";

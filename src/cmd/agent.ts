@@ -111,13 +111,27 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
 
     logger.info("Starting %d workers", numWorkers);
 
-    // Fork workers.
     for (let i = 0; i < numWorkers; i++) {
-      cluster.fork();
+      const worker = cluster.fork();
+      worker.on("error", (err) => {
+        logger.error("Error from worker: %s)", err);
+      });
     }
 
     cluster.on("exit", (worker, code, signal) => {
-      logger.debug("Worker with pid %d stopped", process.pid);
+      logger.debug(
+        "Worker with pid %d stopped (exit code: %d, signal: %s)",
+        worker.process.pid,
+        code,
+        signal
+      );
+      if (code !== 0) {
+        logger.debug(
+          "Worker was stopped unexpectedly, starting a new one",
+          worker
+        );
+        cluster.fork();
+      }
     });
   } else {
     const agent: Agent = {

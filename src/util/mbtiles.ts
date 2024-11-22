@@ -1,6 +1,5 @@
 import MBTilesOrig from "@mapbox/mbtiles";
 import zlib from "node:zlib";
-import { Mutex, MutexInterface } from "async-mutex";
 import { trace } from "@opentelemetry/api";
 
 export type MBTiles = {
@@ -18,7 +17,6 @@ type MBTilesRef = MBTiles & {
 
 const tracer = trace.getTracer("mbtiles");
 
-const mutex = new Mutex();
 const mbtilesRegistry = new Map<string, MBTilesRef>();
 
 export const openMbtiles = async (
@@ -37,54 +35,52 @@ const getMbtilesRef = async (
   forceXyz?: boolean
 ): Promise<MBTilesRef> => {
   return tracer.startActiveSpan("getMbtilesRef", async (span) => {
-    return mutex
-      .runExclusive(async () => {
-        const mode = `?mode=${writable ? "rwc" : "ro"}`;
-        const mbtilesFile = path + mode;
+    try {
+      const mode = `?mode=${writable ? "rwc" : "ro"}`;
+      const mbtilesFile = path + mode;
 
-        if (mbtilesRegistry.has(mbtilesFile)) {
-          const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
-          mbtiles.refCount++;
+      if (mbtilesRegistry.has(mbtilesFile)) {
+        const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
+        mbtiles.refCount++;
 
-          //console.log("REF INC", mbtilesFile, mbtiles.refCount);
-
-          return mbtiles;
-        }
-
-        const mbtiles = await open(mbtilesFile, writable, concurrent, forceXyz);
-        mbtilesRegistry.set(mbtilesFile, mbtiles);
-
-        //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
+        //console.log("REF INC", mbtilesFile, mbtiles.refCount);
 
         return mbtiles;
-      })
-      .finally(() => span.end());
+      }
+
+      const mbtiles = await open(mbtilesFile, writable, concurrent, forceXyz);
+      mbtilesRegistry.set(mbtilesFile, mbtiles);
+
+      //console.log("REF NEW", mbtilesFile, mbtiles.refCount);
+
+      return mbtiles;
+    } finally {
+      span.end();
+    }
   });
 };
 
 const putMbtilesRef = async (mbtilesFile: string): Promise<boolean> => {
-  return mutex.runExclusive(async () => {
-    if (mbtilesRegistry.has(mbtilesFile)) {
-      const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
-      mbtiles.refCount--;
+  if (mbtilesRegistry.has(mbtilesFile)) {
+    const mbtiles = mbtilesRegistry.get(mbtilesFile) as MBTilesRef;
+    mbtiles.refCount--;
 
-      //console.log("REF DEC", mbtilesFile, mbtiles.refCount);
+    //console.log("REF DEC", mbtilesFile, mbtiles.refCount);
 
-      if (mbtiles.refCount === 0) {
-        mbtilesRegistry.delete(mbtilesFile);
+    if (mbtiles.refCount === 0) {
+      mbtilesRegistry.delete(mbtilesFile);
 
-        /*console.log("REF DEL", mbtilesFile, mbtiles.refCount);
+      /*console.log("REF DEL", mbtilesFile, mbtiles.refCount);
 
         if (mbtilesRegistry.size === 0) {
           console.log("REF CLEAR");
         }*/
 
-        return true;
-      }
+      return true;
     }
+  }
 
-    return false;
-  });
+  return false;
 };
 
 const open = async (
@@ -131,17 +127,6 @@ const open = async (
   });
 };
 
-const runExclusive: <T>(
-  mutex: Mutex | undefined,
-  callback: () => Promise<T>
-) => Promise<T> = (mutex, callback) => {
-  if (mutex) {
-    return mutex.runExclusive(callback);
-  }
-
-  return callback();
-};
-
 const wrap = (
   mbtiles: any,
   mbtilesFile: string,
@@ -149,8 +134,6 @@ const wrap = (
   concurrent: boolean | undefined,
   forceXyz: boolean | undefined
 ): MBTilesRef => {
-  const mutex = writable && concurrent ? new Mutex() : undefined;
-
   return {
     refCount: 1,
     getTile: (z: number, x: number, y: number) => {
@@ -189,7 +172,7 @@ const wrap = (
       return tracer.startActiveSpan(
         "mbtiles.hasTile",
         async (span): Promise<boolean> => {
-          return runExclusive(mutex, async (): Promise<boolean> => {
+          try {
             return new Promise((resolve, reject) => {
               const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
 
@@ -201,7 +184,9 @@ const wrap = (
                 return resolve(true);
               });
             });
-          }).finally(() => span.end());
+          } finally {
+            span.end();
+          }
         }
       );
     },
@@ -209,17 +194,15 @@ const wrap = (
       if (!writable) {
         throw new Error(`${mbtilesFile} not writable`);
       }
-      return runExclusive(mutex, async () => {
-        return new Promise((resolve, reject) => {
-          const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
+      return new Promise((resolve, reject) => {
+        const row = forceXyz ? Math.pow(2, z) - y - 1 : y;
 
-          mbtiles.putTile(z, x, row, buffer, (err: any) => {
-            if (err) {
-              return reject(err);
-            }
+        mbtiles.putTile(z, x, row, buffer, (err: any) => {
+          if (err) {
+            return reject(err);
+          }
 
-            return resolve();
-          });
+          return resolve();
         });
       });
     },
@@ -227,20 +210,18 @@ const wrap = (
       if (!writable) {
         throw new Error(`${mbtilesFile} not writable`);
       }
-      return runExclusive(mutex, async () => {
-        return new Promise((resolve, reject) => {
-          mbtiles.putInfo(
-            //TODO: overwritten by @mapbox/mbtiles
-            { ...data, scheme: forceXyz ? "xyz" : "tms" },
-            (err: any) => {
-              if (err) {
-                return reject(err);
-              }
-
-              return resolve();
+      return new Promise((resolve, reject) => {
+        mbtiles.putInfo(
+          //TODO: overwritten by @mapbox/mbtiles
+          { ...data, scheme: forceXyz ? "xyz" : "tms" },
+          (err: any) => {
+            if (err) {
+              return reject(err);
             }
-          );
-        });
+
+            return resolve();
+          }
+        );
       });
     },
     close: async () => {

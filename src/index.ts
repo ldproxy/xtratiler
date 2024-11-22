@@ -7,6 +7,7 @@ if (process.env.XTRATILER_INSTRUMENTATION === "true") {
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import cmds from "./cmd/index.js";
+import cluster from "node:cluster";
 
 export type GlobalArgs = {
   verbose: number;
@@ -37,5 +38,9 @@ const cli = yargs(args)
     description: "Do not ask for confirmation",
   });
 /*.epilogue("for more information, find our manual at http://example.com")*/
+
+if (!cluster.isPrimary) {
+  cli.fail(false);
+}
 
 cli.wrap(Math.min(100, cli.terminalWidth())).parse();
