@@ -36,11 +36,23 @@ const cli = yargs(args)
   .option("yes", {
     type: "boolean",
     description: "Do not ask for confirmation",
-  });
-/*.epilogue("for more information, find our manual at http://example.com")*/
+  })
+  .option("instrumentation", {
+    alias: "i",
+    type: "boolean",
+    hidden: true,
+    description: "Enable OpenTelemetry instrumentation",
+  })
+  .epilogue(
+    "for more information, see the documentation at https://docs.ldproxy.net/tools/xtratiler"
+  );
 
 if (!cluster.isPrimary) {
   cli.fail(false);
+}
+
+if (process.env.XTRAPLATFORM_ENV !== "CONTAINER") {
+  cli.env("XTRATILER").config();
 }
 
 cli.wrap(Math.min(100, cli.terminalWidth())).parse();

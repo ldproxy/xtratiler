@@ -33,4 +33,6 @@ COPY --from=builder /src/dist/app /app
 
 WORKDIR /store
 
+ENV XTRAPLATFORM_ENV=CONTAINER
+
 ENTRYPOINT ["/app/bin/xt"]

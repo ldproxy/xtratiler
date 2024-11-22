@@ -29,7 +29,7 @@ export const describe =
   "connect to job queue and process raster tile rendering jobs";
 
 export const builder = (yargs: Argv<{}>) => {
-  return yargs
+  const options = yargs
     .option("queue-url", {
       alias: "q",
       type: "string",
@@ -67,16 +67,10 @@ export const builder = (yargs: Argv<{}>) => {
       alias: "c",
       type: "number",
       nargs: 1,
-      description: "number of jobs processed concurrently",
+      description:
+        "number of jobs processed concurrently (max: number of CPU cores)",
       default: 1,
       choices: [1, 2, 4, 8, 16, 32],
-      group: "Agent options:",
-    })
-    .option("file-log", {
-      alias: "f",
-      type: "boolean",
-      default: false,
-      description: "log to file instead of stdout",
       group: "Agent options:",
     })
     .option("debug-only-compute", {
@@ -89,6 +83,18 @@ export const builder = (yargs: Argv<{}>) => {
       ['$0 --config "~/config.json"', "Use custom config"],
       ["$0 --safe", "Start in safe mode"],
     ])*/
+
+  if (process.env.XTRAPLATFORM_ENV !== "CONTAINER") {
+    options.option("file-log", {
+      alias: "f",
+      type: "boolean",
+      default: false,
+      description: "log to file instead of stdout",
+      group: "Agent options:",
+    });
+  }
+
+  return options;
 };
 
 type Agent = {
@@ -99,6 +105,7 @@ type Agent = {
   concurrencyEnabled: boolean;
   connected: boolean;
   debugOnlyCompute: boolean;
+  verbosity: number;
   logger: Logger;
 };
 
@@ -107,7 +114,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const logger = await createLogger(argv2.verbose, argv2.fileLog, argv2.store);
 
   if (cluster.isPrimary) {
-    const numWorkers = Math.min(availableParallelism(), argv2.concurrency);
+    const numWorkers = Math.min(availableParallelism() - 1, argv2.concurrency);
 
     logger.info("Starting %d workers", numWorkers);
 
@@ -142,6 +149,7 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
       concurrencyEnabled: true,
       connected: false,
       debugOnlyCompute: argv2.debugOnlyCompute,
+      verbosity: argv2.verbose,
       logger,
     };
 
@@ -277,6 +285,7 @@ const processJob = async (agent: Agent, job: any) => {
     mbtilesForceXyz: false,
     storage,
     agent: true,
+    verbosity: agent.verbosity,
     debugOnlyCompute: agent.debugOnlyCompute,
     updateProgress: (progress, last) => {
       agent.logger.debug("Updating job progress: %s", job.id);

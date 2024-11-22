@@ -37,6 +37,7 @@ export type JobParameters = {
   mbtilesForceXyz: boolean;
   storage: Storage;
   agent: boolean;
+  verbosity: number;
   debugOnlyCompute: boolean;
   updateProgress: (progress: Progress, last?: boolean) => Promise<void>;
 };
@@ -72,8 +73,20 @@ type Progress = {
 const tracer = trace.getTracer("renderer");
 
 export const render = async (parameters: JobParameters, logger: Logger) => {
-  const { id, api, tileset, tmsId, z, minX, maxX, minY, maxY, agent, storage } =
-    parameters;
+  const {
+    id,
+    api,
+    tileset,
+    tmsId,
+    z,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    agent,
+    storage,
+    verbosity,
+  } = parameters;
 
   const styleId = getStyleId(
     storage.type === StorageType.DETECT
@@ -109,7 +122,7 @@ export const render = async (parameters: JobParameters, logger: Logger) => {
 
       const progressLogger = setInterval(
         () => logger.info(progressMessage(progress, "Running"), jobInfo),
-        1000
+        verbosity === 0 ? 10000 : verbosity === 1 ? 5000 : 1000
       );
       let progressUpdater: NodeJS.Timeout | undefined;
       let lastUpdate: Promise<void> = Promise.resolve();

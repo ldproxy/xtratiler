@@ -160,7 +160,9 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     mbtilesForceXyz: argv2.mbtilesForceXyz,
     storage,
     agent: false,
-    updateProgress: () => {},
+    verbosity: argv2.verbose,
+    debugOnlyCompute: false,
+    updateProgress: async () => {},
   };
 
   const proceed = argv.yes || (await confirmRender(job));
