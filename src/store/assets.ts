@@ -1,4 +1,5 @@
 import { RequestResponse, ResourceKind } from "@maplibre/maplibre-gl-native";
+import makeFetchHappen from "make-fetch-happen";
 import { Store } from "./index.js";
 import { Logger } from "../util/logger.js";
 import { ResourceType, getResourceType } from "./common.js";
@@ -16,6 +17,11 @@ export const createAssetReader = (
   logger: Logger
 ): AssetReader => {
   const assets = new Map<string, Buffer>();
+
+  const fetch = makeFetchHappen.defaults({
+    cachePath: `${store.path}/.assets`,
+    cache: "default",
+  });
 
   return ({ url, kind }, callback) => {
     tracer.startActiveSpan(
