@@ -323,6 +323,7 @@ export const createStoreFs = async (
 
   return {
     type: StoreType.FS,
+    dir: storeDir,
     api,
     perTile: seeding.perTile,
     perJob: seeding.perJob,
@@ -615,6 +616,7 @@ export const createStoreFsExplicit = async (
 
   return {
     type: StoreType.FS,
+    dir: storeDir,
     api,
     perTile: storage.tileStorage === "PER_TILE",
     perJob: storage.tileStorage === "PER_JOB",

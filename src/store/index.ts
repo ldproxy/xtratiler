@@ -33,6 +33,7 @@ export type StorageExplicit = Storage & {
 
 export interface Store {
   type: StoreType;
+  dir: string;
   api: string;
   perTile: boolean;
   perJob: boolean;

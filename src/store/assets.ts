@@ -19,7 +19,7 @@ export const createAssetReader = (
   const assets = new Map<string, Buffer>();
 
   const fetch = makeFetchHappen.defaults({
-    cachePath: `${store.path}/.assets`,
+    cachePath: `${store.dir}/.assets`,
     cache: "default",
   });
 
