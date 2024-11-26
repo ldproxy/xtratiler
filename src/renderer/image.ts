@@ -8,8 +8,9 @@ import { AssetReader } from "../store/assets.js";
 import { context, propagation, Tracer } from "@opentelemetry/api";
 import EventEmitter from "node:events";
 
-const ml: EventEmitter = mapLibre as unknown as EventEmitter;
-ml.on("message", (msg) => {
+//TODO: only once per process, but with logger
+const mapLibreEvents: EventEmitter = mapLibre as unknown as EventEmitter;
+mapLibreEvents.on("message", (msg) => {
   console.log(msg);
 });
 
