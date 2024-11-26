@@ -1,10 +1,12 @@
 import { Argv, ArgumentsCamelCase } from "yargs";
-import { basename } from "path";
+import { asyncForEach } from "modern-async";
+import cluster from "node:cluster";
+import { availableParallelism } from "node:os";
+import process from "node:process";
 
 import { GlobalArgs } from "../index.js";
-import { Logger, createLogger } from "../util/index.js";
+import { Logger, createLogger } from "../util/logger.js";
 import { JobParameters, render } from "../renderer/index.js";
-import { asyncForEach } from "modern-async";
 import {
   findEntityPaths,
   getCaches,
@@ -18,6 +20,7 @@ export type AgentArgs = GlobalArgs & {
   ratio: 1 | 2 | 4 | 8;
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   fileLog: boolean;
+  debugOnlyCompute: boolean;
 };
 
 export const command = "agent";
@@ -26,7 +29,7 @@ export const describe =
   "connect to job queue and process raster tile rendering jobs";
 
 export const builder = (yargs: Argv<{}>) => {
-  return yargs
+  const options = yargs
     .option("queue-url", {
       alias: "q",
       type: "string",
@@ -64,22 +67,34 @@ export const builder = (yargs: Argv<{}>) => {
       alias: "c",
       type: "number",
       nargs: 1,
-      description: "number of jobs processed concurrently",
+      description:
+        "number of jobs processed concurrently (max: number of CPU cores)",
       default: 1,
       choices: [1, 2, 4, 8, 16, 32],
       group: "Agent options:",
     })
-    .option("file-log", {
+    .option("debug-only-compute", {
+      alias: "d",
+      type: "boolean",
+      default: false,
+      hidden: true,
+    });
+  /*.example([
+      ['$0 --config "~/config.json"', "Use custom config"],
+      ["$0 --safe", "Start in safe mode"],
+    ])*/
+
+  if (process.env.XTRAPLATFORM_ENV !== "CONTAINER") {
+    options.option("file-log", {
       alias: "f",
       type: "boolean",
       default: false,
       description: "log to file instead of stdout",
       group: "Agent options:",
     });
-  /*.example([
-      ['$0 --config "~/config.json"', "Use custom config"],
-      ["$0 --safe", "Start in safe mode"],
-    ])*/
+  }
+
+  return options;
 };
 
 type Agent = {
@@ -89,23 +104,56 @@ type Agent = {
   concurrency: 1 | 2 | 4 | 8 | 16 | 32;
   concurrencyEnabled: boolean;
   connected: boolean;
+  debugOnlyCompute: boolean;
+  verbosity: number;
   logger: Logger;
 };
 
 export const handler = async (argv: ArgumentsCamelCase<{}>) => {
   const argv2 = argv as ArgumentsCamelCase<AgentArgs>;
+  const logger = await createLogger(argv2.verbose, argv2.fileLog, argv2.store);
 
-  const agent: Agent = {
-    queueUrl: `${argv2.queueUrl}/api/jobs`,
-    storePath: argv2.store,
-    ratio: argv2.ratio,
-    concurrency: argv2.concurrency,
-    concurrencyEnabled: true,
-    connected: false,
-    logger: await createLogger(argv2.verbose, argv2.fileLog, argv2.store),
-  };
+  if (cluster.isPrimary) {
+    const numWorkers = Math.min(availableParallelism() - 1, argv2.concurrency);
 
-  /*const tps = await findEntityPaths(agent.storePath);
+    logger.info("Starting %d workers", numWorkers);
+
+    for (let i = 0; i < numWorkers; i++) {
+      const worker = cluster.fork();
+      worker.on("error", (err) => {
+        logger.error("Error from worker: %s)", err);
+      });
+    }
+
+    cluster.on("exit", (worker, code, signal) => {
+      logger.debug(
+        "Worker with pid %d stopped (exit code: %d, signal: %s)",
+        worker.process.pid,
+        code,
+        signal
+      );
+      if (code !== 0) {
+        logger.debug(
+          "Worker was stopped unexpectedly, starting a new one",
+          worker
+        );
+        cluster.fork();
+      }
+    });
+  } else {
+    const agent: Agent = {
+      queueUrl: `${argv2.queueUrl}/api/jobs`,
+      storePath: argv2.store,
+      ratio: argv2.ratio,
+      concurrency: argv2.concurrency,
+      concurrencyEnabled: true,
+      connected: false,
+      debugOnlyCompute: argv2.debugOnlyCompute,
+      verbosity: argv2.verbose,
+      logger,
+    };
+
+    /*const tps = await findEntityPaths(agent.storePath);
   for (const tp of tps) {
     const api = basename(tp, "-tiles.yml");
     const provider = await getProviderByPath(tp);
@@ -122,15 +170,18 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     }
   }*/
 
-  readFromQueue(agent)
-    .then(() => {
-      agent.logger.info("Disconnected from job queue: %s", agent.queueUrl);
-      process.exit(0);
-    })
-    .catch((err) => {
-      agent.logger.error(err);
-      process.exit(1);
-    });
+    readFromQueue(agent)
+      .then(() => {
+        logger.info("Disconnected from job queue: %s", agent.queueUrl);
+        process.exit(0);
+      })
+      .catch((err) => {
+        logger.error(err);
+        process.exit(1);
+      });
+
+    logger.debug("Worker with pid %d started", process.pid);
+  }
 };
 
 async function readFromQueue(agent: Agent) {
@@ -139,7 +190,7 @@ async function readFromQueue(agent: Agent) {
     async (job: any) => {
       await processJob(agent, job);
     },
-    agent.concurrencyEnabled ? agent.concurrency : 1
+    1 //agent.concurrencyEnabled ? agent.concurrency : 1
   );
 }
 
@@ -234,6 +285,8 @@ const processJob = async (agent: Agent, job: any) => {
     mbtilesForceXyz: false,
     storage,
     agent: true,
+    verbosity: agent.verbosity,
+    debugOnlyCompute: agent.debugOnlyCompute,
     updateProgress: (progress, last) => {
       agent.logger.debug("Updating job progress: %s", job.id);
 

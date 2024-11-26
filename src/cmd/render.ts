@@ -2,7 +2,7 @@ import { Argv, ArgumentsCamelCase } from "yargs";
 import confirm from "@inquirer/confirm";
 
 import { JobParameters, render } from "../renderer/index.js";
-import { createLogger } from "../util/index.js";
+import { createLogger } from "../util/logger.js";
 import { GlobalArgs } from "../index.js";
 import { StorageDetect, StorageType } from "../store/index.js";
 
@@ -160,7 +160,9 @@ export const handler = async (argv: ArgumentsCamelCase<{}>) => {
     mbtilesForceXyz: argv2.mbtilesForceXyz,
     storage,
     agent: false,
-    updateProgress: () => {},
+    verbosity: argv2.verbose,
+    debugOnlyCompute: false,
+    updateProgress: async () => {},
   };
 
   const proceed = argv.yes || (await confirmRender(job));

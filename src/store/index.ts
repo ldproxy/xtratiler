@@ -1,4 +1,4 @@
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { ResourceType } from "./common.js";
 import { createStoreFs, createStoreFsExplicit } from "./fs.js";
 
@@ -33,6 +33,7 @@ export type StorageExplicit = Storage & {
 
 export interface Store {
   type: StoreType;
+  dir: string;
   api: string;
   perTile: boolean;
   perJob: boolean;

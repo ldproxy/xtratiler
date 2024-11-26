@@ -1,6 +1,6 @@
 {
   "name": "xtratiler",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "description": "raster tile renderer for ldproxy",
   "author": "interactive instruments GmbH",
   "license": "MIT",
@@ -24,8 +24,17 @@
     "docs": "cli-docs-generator --cli=./build/xt.sh --pretty_cli_name=xtratiler --output=./docs/COMMANDS.md -v"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "^0.54.2",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.54.2",
+    "@opentelemetry/resources": "^1.27.0",
+    "@opentelemetry/sdk-metrics": "^1.27.0",
+    "@opentelemetry/sdk-node": "^0.54.2",
+    "@opentelemetry/sdk-trace-node": "^1.27.0",
+    "@opentelemetry/semantic-conventions": "^1.27.0",
     "@tsconfig/node20": "^20.1.4",
     "@types/js-yaml": "^4.0.9",
+    "@types/make-fetch-happen": "^10.0.4",
     "@types/mapbox__sphericalmercator": "^1.2.3",
     "@types/node": "^20.12.7",
     "@types/pretty-time": "^1.1.5",
@@ -52,16 +61,19 @@
     "@mapbox/sphericalmercator": "^1.2.0",
     "@maplibre/maplibre-gl-native": "^5.4.0",
     "@maplibre/maplibre-gl-style-spec": "^20.1.1",
-    "async-mutex": "^0.5.0",
     "filehound": "^1.17.6",
     "js-yaml": "^4.1.0",
+    "make-fetch-happen": "^14.0.3",
     "modern-async": "^2.0.0",
     "pino": "^8.20.0",
-    "pino-pretty": "^11.2.1",
-    "pino-roll": "^1.1.0",
+    "pino-pretty": "^13.0.0",
+    "pino-roll": "^2.2.0",
     "pretty-time": "^1.1.0",
     "promisify-child-process": "^4.1.2",
     "sharp": "^0.33.3",
     "yargs": "^17.7.2"
+  },
+  "resolutions": {
+    "sqlite3": "5.1.7"
   }
 }

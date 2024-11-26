@@ -1,12 +1,14 @@
 import fs from "fs/promises";
 import fsSync from "fs";
 import { join, dirname } from "path";
-import { Mutex } from "async-mutex";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
 import { getCaches, getProvider } from "./provider.js";
 import { MBTiles, openMbtiles } from "../util/mbtiles.js";
 import { StorageExplicit, Store, StoreType } from "./index.js";
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("store-fs");
 
 const isPerTile = (cache: Cache) =>
   cache.storage === "PLAIN" || cache.storage === "PER_TILE";
@@ -321,6 +323,7 @@ export const createStoreFs = async (
 
   return {
     type: StoreType.FS,
+    dir: storeDir,
     api,
     perTile: seeding.perTile,
     perJob: seeding.perJob,
@@ -429,39 +432,47 @@ export const createStoreFsExplicit = async (
   };
 
   const readTile = async (relPath: string) => {
-    const tile = relPath.split("/");
-    const zyx = tile.slice(1).map((d) => parseInt(d));
-    let tilePath = vectorPath;
+    return await tracer.startActiveSpan("readTile", async (span) => {
+      const tile = relPath.split("/");
+      const zyx = tile.slice(1).map((d) => parseInt(d));
+      let tilePath = vectorPath;
 
-    //TODO
-    if (isPerTile2(storage)) {
-      tilePath = vectorPathExisting(zyx[1], zyx[2]);
-
-      logger.trace(`-> tile ${tilePath}`);
-
-      return fs.readFile(tilePath);
-    }
-
-    if (tilePath.includes("{partition}")) {
-      const partition = getPartition(zyx[0], zyx[2], zyx[1]);
-      tilePath = tilePath.replace("{partition}", partition);
-    }
-
-    logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[1]}/${zyx[2]}`);
-
-    try {
-      const mbt = await getMbtiles(tilePath);
-
-      return mbt.getTile(zyx[0], zyx[2], zyx[1]);
-    } catch (err: any) {
       //TODO
-      if (storage.tileStorage === "PER_JOB") {
-        err.code = "ENOENT";
-        throw err;
+      if (isPerTile2(storage)) {
+        tilePath = vectorPathExisting(zyx[1], zyx[2]);
+
+        logger.trace(`-> tile ${tilePath}`);
+
+        const content = fs.readFile(tilePath);
+
+        span.end();
+
+        return content;
       }
 
-      throw err;
-    }
+      if (tilePath.includes("{partition}")) {
+        const partition = getPartition(zyx[0], zyx[2], zyx[1]);
+        tilePath = tilePath.replace("{partition}", partition);
+      }
+
+      logger.trace(`-> mbtiles ${tilePath}:${zyx[0]}/${zyx[1]}/${zyx[2]}`);
+
+      try {
+        const mbt = await getMbtiles(tilePath);
+
+        return mbt.getTile(zyx[0], zyx[2], zyx[1]);
+      } catch (err: any) {
+        //TODO
+        if (storage.tileStorage === "PER_JOB") {
+          err.code = "ENOENT";
+          throw err;
+        }
+
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
   };
 
   const hasTile = async (
@@ -472,8 +483,25 @@ export const createStoreFsExplicit = async (
     y: number,
     forceXyz: boolean
   ): Promise<boolean> => {
-    if (isPerTile2(storage)) {
-      const tilePath = rasterPathExisting2(y, x);
+    return await tracer.startActiveSpan("hasTile", async (span) => {
+      if (isPerTile2(storage)) {
+        const tilePath = rasterPathExisting2(y, x);
+
+        let exists = false;
+
+        try {
+          await fs.access(tilePath, fs.constants.F_OK);
+          exists = true;
+        } catch (err) {
+          // Handle error
+        } finally {
+          span.end();
+        }
+
+        return exists;
+      }
+
+      const tilePath = rasterPathExisting();
 
       let exists = false;
 
@@ -481,33 +509,23 @@ export const createStoreFsExplicit = async (
         await fs.access(tilePath, fs.constants.F_OK);
         exists = true;
       } catch (err) {
-        // Handle error
+        // ignore
       }
 
+      if (!exists) {
+        span.end();
+        return false;
+      }
+
+      // since hasTile is only used by writeTile and mbtiles instances are cached, we need to set writable to true
+      const mbt = await getMbtiles(tilePath, true, forceXyz);
+
+      exists = await mbt.hasTile(z, x, y);
+
+      span.end();
+
       return exists;
-    }
-
-    const tilePath = rasterPathExisting();
-
-    let exists = false;
-
-    try {
-      await fs.access(tilePath, fs.constants.F_OK);
-      exists = true;
-    } catch (err) {
-      // ignore
-    }
-
-    if (!exists) {
-      return false;
-    }
-
-    // since hasTile is only used by writeTile and mbtiles instances are cached, we need to set writable to true
-    const mbt = await getMbtiles(tilePath, true, forceXyz);
-
-    exists = await mbt.hasTile(z, x, y);
-
-    return exists;
+    });
   };
 
   const writeTile = async (
@@ -519,33 +537,38 @@ export const createStoreFsExplicit = async (
     png: Buffer,
     forceXyz: boolean
   ): Promise<void> => {
-    if (isPerTile2(storage)) {
-      const tilePath = rasterPath
-        .replace("{row}", `${y}`)
-        .replace("{col}", `${x}`);
+    return await tracer.startActiveSpan("writeTile", async (span) => {
+      if (isPerTile2(storage)) {
+        const tilePath = rasterPath
+          .replace("{row}", `${y}`)
+          .replace("{col}", `${x}`);
+
+        await fs.mkdir(dirname(tilePath), {
+          recursive: true,
+        });
+        await fs.writeFile(tilePath, png);
+
+        logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
+        span.end();
+
+        return;
+      }
+
+      const tilePath = rasterPath;
 
       await fs.mkdir(dirname(tilePath), {
         recursive: true,
       });
-      await fs.writeFile(tilePath, png);
+
+      const mbt = await getMbtiles(tilePath, true, forceXyz);
+      await mbt.putTile(z, x, y, png);
 
       logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
-      return;
-    }
 
-    const tilePath = rasterPath;
-
-    await fs.mkdir(dirname(tilePath), {
-      recursive: true,
+      span.end();
     });
-
-    const mbt = await getMbtiles(tilePath, true, forceXyz);
-    await mbt.putTile(z, x, y, png);
-
-    logger.debug(`Stored tile ${z}/${y}/${x} at: ${tilePath}`);
   };
 
-  const mutex = new Mutex();
   const mbtiles = new Map<string, MBTiles>();
 
   const getMbtiles = async (
@@ -553,30 +576,34 @@ export const createStoreFsExplicit = async (
     writable?: boolean,
     forceXyz?: boolean
   ): Promise<MBTiles> => {
-    return mutex.runExclusive(async () => {
-      if (mbtiles.has(path)) {
-        return mbtiles.get(path) as MBTiles;
+    return tracer.startActiveSpan("getMbtiles", async (span) => {
+      try {
+        if (mbtiles.has(path)) {
+          return mbtiles.get(path) as MBTiles;
+        }
+
+        const mbt = await openMbtiles(
+          path,
+          writable,
+          storage.tileStorage === "PER_TILESET",
+          forceXyz
+        );
+        mbtiles.set(path, mbt);
+
+        if (writable) {
+          await mbt.putInfo({
+            name: path.substring(path.lastIndexOf("/") + 1),
+            format: "png",
+          });
+        }
+
+        const info = await mbt.getInfo();
+        //console.log("INFO", info);
+
+        return mbt;
+      } finally {
+        span.end();
       }
-
-      const mbt = await openMbtiles(
-        path,
-        writable,
-        storage.tileStorage === "PER_TILESET",
-        forceXyz
-      );
-      mbtiles.set(path, mbt);
-
-      if (writable) {
-        await mbt.putInfo({
-          name: path.substring(path.lastIndexOf("/") + 1),
-          format: "png",
-        });
-      }
-
-      const info = await mbt.getInfo();
-      //console.log("INFO", info);
-
-      return mbt;
     });
   };
 
@@ -589,6 +616,7 @@ export const createStoreFsExplicit = async (
 
   return {
     type: StoreType.FS,
+    dir: storeDir,
     api,
     perTile: storage.tileStorage === "PER_TILE",
     perJob: storage.tileStorage === "PER_JOB",

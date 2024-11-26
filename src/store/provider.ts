@@ -5,7 +5,7 @@ import filehound from "filehound";
 import yaml from "js-yaml";
 
 import { Cache, ResourceType, resourceTypeToDir } from "./common.js";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 
 const findEntityPath = async (
   storeDir: string,

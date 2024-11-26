@@ -1,13 +1,22 @@
-import mapLibre, { Map, RenderOptions } from "@maplibre/maplibre-gl-native";
+import mapLibre, { RenderOptions } from "@maplibre/maplibre-gl-native";
 import { StyleSpecification } from "@maplibre/maplibre-gl-style-spec";
 import sharp from "sharp";
 
 import { Store } from "../store/index.js";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 import { AssetReader } from "../store/assets.js";
+import { context, propagation, Tracer } from "@opentelemetry/api";
+import EventEmitter from "node:events";
+
+//TODO: only once per process, but with logger
+const mapLibreEvents: EventEmitter = mapLibre as unknown as EventEmitter;
+mapLibreEvents.on("message", (msg) => {
+  console.log(msg);
+});
 
 type RenderParameters = {
   assetReader: AssetReader;
+  styleId: string;
   style: StyleSpecification;
   zoom: number;
   center: [number, number];
@@ -18,9 +27,15 @@ type RenderParameters = {
   ratio: number;
 };
 
+interface TraceContext {
+  traceparent?: string;
+  tracestate?: string;
+}
+
 export const renderImage = async (
   params: RenderParameters,
-  logger: Logger
+  logger: Logger,
+  tracer: Tracer
 ): Promise<Buffer> => {
   let resizeFactor = 1;
 
@@ -32,24 +47,70 @@ export const renderImage = async (
     params.zoom = 0;
   }
 
-  const img = await renderMapLibre(params, logger);
+  const img = await tracer.startActiveSpan("renderMapLibre", (span) =>
+    renderMapLibre(params, logger).finally(() => span.end())
+  );
 
-  return await toPNG(img, resizeFactor, params, logger);
+  const span = tracer.startSpan("toPNG");
+  const png = await toPNG(img, resizeFactor, params, logger);
+  span.end();
+
+  return png;
 };
 
+const maps = new Map<string, mapLibre.Map>();
+
+const close = () => {
+  for (const map of maps.values()) {
+    try {
+      map.release();
+    } catch (e) {
+      // ignore
+    }
+  }
+};
+
+process.on("SIGINT", close);
+process.on("SIGTERM", close);
+
 const renderMapLibre = async (
-  { style, assetReader, zoom, center, width, height, ratio }: RenderParameters,
+  {
+    styleId,
+    style,
+    assetReader,
+    zoom,
+    center,
+    width,
+    height,
+    ratio,
+  }: RenderParameters,
   logger: Logger
 ): Promise<Uint8Array> => {
-  //TODO: only create on Map per job?
-  const map = new mapLibre.Map({
-    request: assetReader,
-    ratio,
-  });
+  const traceContext: TraceContext = {};
+  propagation.inject(context.active(), traceContext);
+
+  if (!maps.has(styleId)) {
+    //TODO: only create on Map per job?
+    const map = new mapLibre.Map({
+      request: (request, callback) => {
+        const activeContext = propagation.extract(
+          context.active(),
+          traceContext
+        );
+        context.with(activeContext, () => {
+          assetReader(request, callback);
+        });
+      },
+      ratio,
+    });
+
+    maps.set(styleId, map);
+
+    map.load(style);
+  }
+  const map = maps.get(styleId) as mapLibre.Map;
 
   //logger.debug("Render map with style: \n" + JSON.stringify(style, null, 2));
-
-  map.load(style);
 
   const options: RenderOptions = {
     zoom,
@@ -66,17 +127,11 @@ const renderMapLibre = async (
 };
 
 const renderMapLibrePromise = async (
-  map: Map,
+  map: mapLibre.Map,
   options: RenderOptions
 ): Promise<Uint8Array> => {
   return new Promise((resolve, reject) => {
     map.render(options, (error, buffer) => {
-      try {
-        map.release();
-      } catch (e) {
-        // ignore
-      }
-
       if (error) {
         return reject(error);
       }

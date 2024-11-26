@@ -7,7 +7,7 @@ import jsonlint from "@mapbox/jsonlint-lines-primitives";
 import { Store } from "../store/index.js";
 import { ResourceType } from "../store/common.js";
 import { adjustStyle } from "./adjust.js";
-import { Logger } from "../util/index.js";
+import { Logger } from "../util/logger.js";
 
 export type Style = {
   id: string;

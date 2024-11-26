@@ -31,7 +31,7 @@ export const renderTiles = async (jobContext: JobContext) => {
       await renderTile(z, xy[0], xy[1], assetReader, jobContext);
       incProgress();
     },
-    concurrency
+    1 //concurrency
   );
 };
 
@@ -40,54 +40,86 @@ const renderTile = async (
   x: number,
   y: number,
   assetReader: AssetReader,
-  { style, store, tms, ratio, overwrite, mbtilesForceXyz, logger }: JobContext
+  {
+    style,
+    store,
+    tms,
+    ratio,
+    overwrite,
+    mbtilesForceXyz,
+    debugOnlyCompute,
+    logger,
+    tracer,
+  }: JobContext
 ) => {
-  if (!overwrite) {
-    let exists = false;
-    try {
-      exists = await store.hasTile(
-        style.id,
-        tms.name,
-        z,
-        x,
-        y,
-        mbtilesForceXyz
+  return await tracer.startActiveSpan(
+    "renderTile",
+    { attributes: { x, y, overwrite } },
+    async (span) => {
+      if (!overwrite && !debugOnlyCompute) {
+        let exists = false;
+        try {
+          exists = await store.hasTile(
+            style.id,
+            tms.name,
+            z,
+            x,
+            y,
+            mbtilesForceXyz
+          );
+        } catch (e) {
+          exists = false;
+        }
+        if (exists) {
+          logger.debug(`Tile ${z}/${y}/${x} already exists, skipping`);
+          span.end();
+
+          return;
+        }
+      }
+
+      logger.debug(
+        `Rendering tile ${z}/${y}/${x} with size ${tms.tileSize * ratio}px`
       );
-    } catch (e) {
-      exists = false;
-    }
-    if (exists) {
-      logger.debug(`Tile ${z}/${y}/${x} already exists, skipping`);
-      return;
-    }
-  }
 
-  logger.debug(
-    `Rendering tile ${z}/${y}/${x} with size ${tms.tileSize * ratio}px`
+      try {
+        const resultEdgeTile = isEdgeTile(z, x, y);
+        const bufferX = z === 0 ? 0 : tms.tileSize;
+        const bufferY = z === 0 || resultEdgeTile.y ? 0 : tms.tileSize;
+
+        const png = await renderImage(
+          {
+            assetReader,
+            styleId: store.api + "/" + style.id,
+            style: style.spec,
+            zoom: z - 1,
+            center: getTileCenterLonLat(z, x, y, tms.tileSize),
+            width: tms.tileSize + bufferX * 2,
+            height: tms.tileSize + bufferY * 2,
+            bufferX,
+            bufferY,
+            ratio,
+          },
+          logger,
+          tracer
+        );
+
+        if (!debugOnlyCompute) {
+          await store.writeTile(
+            style.id,
+            tms.name,
+            z,
+            x,
+            y,
+            png,
+            mbtilesForceXyz
+          );
+        }
+      } catch (e) {
+        logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
+      } finally {
+        span.end();
+      }
+    }
   );
-
-  try {
-    const resultEdgeTile = isEdgeTile(z, x, y);
-    const bufferX = z === 0 ? 0 : tms.tileSize;
-    const bufferY = z === 0 || resultEdgeTile.y ? 0 : tms.tileSize;
-
-    const png = await renderImage(
-      {
-        assetReader,
-        style: style.spec,
-        zoom: z - 1,
-        center: getTileCenterLonLat(z, x, y, tms.tileSize),
-        width: tms.tileSize + bufferX * 2,
-        height: tms.tileSize + bufferY * 2,
-        bufferX,
-        bufferY,
-        ratio,
-      },
-      logger
-    );
-
-    await store.writeTile(style.id, tms.name, z, x, y, png, mbtilesForceXyz);
-  } catch (e) {
-    logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
-  }
 };

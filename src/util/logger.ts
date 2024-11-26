@@ -19,8 +19,9 @@ export const createLogger = async (
       file: storePath
         ? join(storePath, "log", "xtratiler")
         : join("log", "xtratiler"),
-      extension: ".log",
+      extension: `.${process.pid}.log`,
       frequency: "daily",
+      dateFormat: "yyyy-MM-dd",
       limit: { count: 7 },
       mkdir: true,
     });
@@ -32,10 +33,11 @@ export const createLogger = async (
     },
     pretty({
       levelFirst: true,
-      ignore: "pid,hostname",
+      ignore: "hostname",
       customPrettifiers: {
         name: (value, key, log, { colors }) => colors.dim(`${value}`),
       },
+      translateTime: "yyyy-mm-dd HH:MM:ss.l",
       colorize,
       destination,
     })
