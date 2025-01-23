@@ -1,4 +1,4 @@
-import SphericalMercator from "@mapbox/sphericalmercator";
+import { SphericalMercator } from "@mapbox/sphericalmercator";
 
 const mercator = new SphericalMercator();
 

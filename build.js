@@ -48,6 +48,8 @@ await build({
       values: {
         "require('../../lib/node-v'":
           "require2('../lib/@maplibre/maplibre-gl-native/lib/node-v'",
+        "require('./lib/node-v'":
+          "require2('../lib/@maplibre/maplibre-gl-native/lib/node-v'",
         "process.versions.modules": `"${process.versions.modules}"`,
         "${runtimePlatform}": platform,
         "/mbgl": "/mbgl.node",

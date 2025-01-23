@@ -89,5 +89,5 @@ const parseStyle = (
     }
   }
 
-  return style;
+  return style as StyleSpecification;
 };
