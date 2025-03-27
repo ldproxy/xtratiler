@@ -24,7 +24,7 @@ services:
     ports:
       - "7080:7080"
     volumes:
-      - /path/to/store:/ldproxy/data
+      - /path/to/store:/data
 
   xtratiler:
     image: ghcr.io/ldproxy/xtratiler:latest
