@@ -6,6 +6,11 @@ Rasterkachel-Renderer für [ldproxy](https://github.com/interactive-instruments/
 
 _xtratiler_ ist ein Zubehör für _ldproxy_. Es durchsucht die _ldproxy_ Job-Queue nach Rasterkachel-Jobs. Wenn ein Job gefunden wird, rendert es Rasterkacheln aus bereits vorhandenen Vektorkacheln und einem gegebenen MapLibre Style. Die gerenderten Rasterkacheln werden im _ldproxy_ Store abgelegt und dann von _ldproxy_ veröffentlicht.
 
+### Limitierungen
+
+- Aktuell werden nur Stores vom Typ `FS` unterstützt (siehe [ldproxy Dokumentation](https://docs.ldproxy.net/de/application/20-configuration/10-store-new.html#source-types)).
+- Aktuell werden nur Tile-Caches vom Typ `DYNAMIC` unterstützt (siehe [ldproxy Dokumentation](https://docs.ldproxy.net/de/providers/tile/10-features.html#cache)).
+
 ## Voraussetzungen
 
 Eine _ldproxy_ Instanz mit mindestens einem Tile-Provider mit einem konfigurierten Raster-Tileset wird benötigt, siehe `rasterTilesets` in der [ldproxy Dokumentation](https://docs.ldproxy.net/de/providers/tile/10-features.html).

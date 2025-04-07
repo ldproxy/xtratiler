@@ -6,6 +6,11 @@ Raster tile renderer for [ldproxy](https://github.com/interactive-instruments/ld
 
 _xtratiler_ is an accessory for _ldproxy_. It polls the _ldproxy_ job queue for raster tile jobs. When a job is found, it will render raster tiles from already existing vector tiles and a given MapLibre Style. The renderer raster tiles are written to the _ldproxy_ store and then published by _ldproxy_.
 
+### Limitations
+
+- Only stores of type `FS` are supported for now (see [ldproxy documentation](https://docs.ldproxy.net/application/20-configuration/10-store-new.html#source-types)).
+- Only tile caches of type `DYNAMIC` are supported for now (see [ldproxy documentation](https://docs.ldproxy.net/providers/tile/10-features.html#cache)).
+
 ## Prerequisites
 
 An _ldproxy_ instance with at least one tile provider with a configured raster tileset is needed, see `rasterTilesets` in the [ldproxy documentation](https://docs.ldproxy.net/de/providers/tile/10-features.html).
