@@ -40,6 +40,7 @@ export type JobParameters = {
   verbosity: number;
   debugOnlyCompute: boolean;
   updateProgress: (progress: Progress, last?: boolean) => Promise<void>;
+  addError: (string) => void;
 };
 
 export type JobContext = JobParameters & {

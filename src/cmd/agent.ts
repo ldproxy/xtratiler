@@ -258,6 +258,7 @@ const processJob = async (agent: Agent, job: any) => {
     0,
     job.details.tileSet.lastIndexOf("_")
   );
+  const errors: string[] = [];
 
   const storage: StorageExplicit = {
     type: StorageType.EXPLICIT,
@@ -287,6 +288,7 @@ const processJob = async (agent: Agent, job: any) => {
     agent: true,
     verbosity: agent.verbosity,
     debugOnlyCompute: agent.debugOnlyCompute,
+    addError: (err) => errors.push(err),
     updateProgress: (progress, last) => {
       agent.logger.debug("Updating job progress: %s", job.id);
 
@@ -306,9 +308,13 @@ const processJob = async (agent: Agent, job: any) => {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-      }).then(() => {
-        agent.logger.debug("Updated job progress: %s", job.id);
-      });
+      })
+        .then(() => {
+          agent.logger.debug("Updated job progress: %s", job.id);
+        })
+        .catch(() => {
+          agent.logger.error("Failed to update job progress: %s", job.id);
+        });
     },
   };
 
@@ -317,6 +323,10 @@ const processJob = async (agent: Agent, job: any) => {
   let error;
   try {
     await render(job2, agent.logger.child({ name: job2.id }));
+
+    if (errors.length > 0) {
+      error = errors.join(" | ");
+    }
   } catch (err) {
     agent.logger.error(`Error rendering job with id ${job2.id}: ${err}`);
     error = err;
@@ -334,5 +344,7 @@ const processJob = async (agent: Agent, job: any) => {
 
     //const del = response.status === 204;
     //console.log(del);
-  } catch (error) {}
+  } catch (error) {
+    agent.logger.error(`Error finishing job with id ${job2.id}: ${error}`);
+  }
 };

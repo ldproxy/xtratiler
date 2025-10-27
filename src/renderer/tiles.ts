@@ -50,6 +50,7 @@ const renderTile = async (
     debugOnlyCompute,
     logger,
     tracer,
+    addError,
   }: JobContext
 ) => {
   return await tracer.startActiveSpan(
@@ -117,6 +118,7 @@ const renderTile = async (
         }
       } catch (e) {
         logger.warn("Error rendering tile %s/%s/%s: %s", z, y, x, e);
+        addError(`${e} [${z}/${y}/${x}]`);
       } finally {
         span.end();
       }
