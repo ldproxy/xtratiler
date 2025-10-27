@@ -70,7 +70,7 @@ await build({
           from: [
             "./node_modules/@img/**/*.node",
             "./node_modules/@img/**/*.dylib",
-            "./node_modules/@img/**/*.so.42",
+            "./node_modules/@img/**/*.so.*",
           ],
           to: ["./lib/@img"],
         },
